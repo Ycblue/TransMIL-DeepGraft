@@ -35,7 +35,9 @@ class Lookahead(Optimizer):
                 param_state['slow_buffer'] = torch.empty_like(fast_p.data)
                 param_state['slow_buffer'].copy_(fast_p.data)
             slow = param_state['slow_buffer']
-            slow.add_(group['lookahead_alpha'], fast_p.data - slow)
+            # slow.add_(group['lookahead_alpha'], fast_p.data - slow)
+            slow.add_(fast_p.data-slow, alpha=group['lookahead_alpha'])
+
             fast_p.data.copy_(slow)
 
     def sync_lookahead(self):

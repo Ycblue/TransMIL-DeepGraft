@@ -14,7 +14,7 @@ def load_loggers(cfg):
 
     log_path = cfg.General.log_path
     Path(log_path).mkdir(exist_ok=True, parents=True)
-    log_name = Path(cfg.config).parent 
+    log_name = str(Path(cfg.config).parent) + f'_{cfg.Model.backbone}'
     version_name = Path(cfg.config).name[:-5]
     cfg.log_path = Path(log_path) / log_name / version_name / f'fold{cfg.Data.fold}'
     print(f'---->Log dir: {cfg.log_path}')
@@ -31,8 +31,10 @@ def load_loggers(cfg):
 
 
 #---->load Callback
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
+from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
 def load_callbacks(cfg):
 
     Mycallbacks = []
@@ -47,7 +49,21 @@ def load_callbacks(cfg):
         verbose=True,
         mode='min'
     )
+
     Mycallbacks.append(early_stop_callback)
+    progress_bar = RichProgressBar(
+        theme=RichProgressBarTheme(
+            description='green_yellow',
+            progress_bar='green1',
+            progress_bar_finished='green1',
+            batch_progress='green_yellow',
+            time='grey82',
+            processing_speed='grey82',
+            metrics='grey82'
+
+        )
+    )
+    Mycallbacks.append(progress_bar)
 
     if cfg.General.server == 'train' :
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_loss',
@@ -64,7 +80,7 @@ def load_callbacks(cfg):
 import torch
 import torch.nn.functional as F
 def cross_entropy_torch(x, y):
-    x_softmax = [F.softmax(x[i]) for i in range(len(x))]
-    x_log = torch.tensor([torch.log(x_softmax[i][y[i]]) for i in range(len(y))])
-    loss = - torch.sum(x_log) / len(y)
+    x_softmax = [F.softmax(x[i], dim=0) for i in range(len(x))]
+    x_log = torch.tensor([torch.log(x_softmax[i][y[i]]) for i in range(y.shape[0])])
+    loss = - torch.sum(x_log) / y.shape[0]
     return loss

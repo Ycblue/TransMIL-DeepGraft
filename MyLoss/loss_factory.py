@@ -34,8 +34,6 @@ def create_loss(args, w1=1.0, w2=0.5):
         loss = L.BinaryDiceLoss()
     elif conf_loss == "dice_log":
         loss = L.BinaryDiceLogLoss()
-    elif conf_loss == "dice_log":
-        loss = L.BinaryDiceLogLoss()
     elif conf_loss == "bce+lovasz":
         loss = L.JointLoss(BCEWithLogitsLoss(), L.BinaryLovaszLoss(), w1, w2)
     elif conf_loss == "lovasz":
@@ -62,6 +60,7 @@ def make_parse():
 if __name__ == '__main__':
     args = make_parse()
     myloss = create_loss(args)
+    print(myloss)
     data = torch.randn(2, 3)
     label = torch.empty(2, dtype=torch.long).random_(3)
     loss = myloss(data, label)

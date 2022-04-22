@@ -5,20 +5,20 @@ General:
     amp_level: O2
     precision: 16 
     multi_gpu_mode: dp
-    gpus: [0]
-    epochs: &epoch 200 
+    gpus: [3]
+    epochs: &epoch 500 
     grad_acc: 2
     frozen_bn: False
-    patience: 10
+    patience: 200
     server: test #train #test
     log_path: logs/
 
 Data:
-    dataset_name: camel_data
+    dataset_name: custom
     data_shuffle: False
-    data_dir: Camelyon16/pt_files/
-    label_dir: dataset_csv/camelyon16/
-    fold: 0
+    data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_all.json'
+    fold: 1
     nfold: 4
 
     train_dataloader:
@@ -29,12 +29,9 @@ Data:
         batch_size: 1
         num_workers: 8
 
-        
-
-
 Model:
     name: TransMIL
-    n_classes: 2
+    n_classes: 6
     backbone: resnet18
 
 

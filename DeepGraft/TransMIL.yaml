@@ -9,15 +9,15 @@ General:
     epochs: &epoch 200 
     grad_acc: 2
     frozen_bn: False
-    patience: 10
+    patience: 200
     server: test #train #test
     log_path: logs/
 
 Data:
-    dataset_name: camel_data
+    dataset_name: custom
     data_shuffle: False
-    data_dir: Camelyon16/pt_files/
-    label_dir: dataset_csv/camelyon16/
+    data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_bin.json'
     fold: 0
     nfold: 4
 
@@ -31,10 +31,9 @@ Data:
 
         
 
-
 Model:
     name: TransMIL
-    n_classes: 2
+    n_classes: 6
     backbone: resnet18
 
 

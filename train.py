@@ -3,8 +3,9 @@ from pathlib import Path
 import numpy as np
 import glob
 
-from datasets import DataInterface
-from models import ModelInterface
+from datasets.data_interface import DataInterface, MILDataModule
+from models.model_interface import ModelInterface
+import models.vision_transformer as vits
 from utils.utils import *
 
 # pytorch_lightning
@@ -15,8 +16,8 @@ from pytorch_lightning import Trainer
 def make_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage', default='train', type=str)
-    parser.add_argument('--config', default='Camelyon/TransMIL.yaml',type=str)
-    parser.add_argument('--gpus', default = [2])
+    parser.add_argument('--config', default='DeepGraft/TransMIL.yaml',type=str)
+    # parser.add_argument('--gpus', default = [2])
     parser.add_argument('--fold', default = 0)
     args = parser.parse_args()
     return args
@@ -34,20 +35,31 @@ def main(cfg):
     cfg.callbacks = load_callbacks(cfg)
 
     #---->Define Data 
-    DataInterface_dict = {'train_batch_size': cfg.Data.train_dataloader.batch_size,
-                'train_num_workers': cfg.Data.train_dataloader.num_workers,
-                'test_batch_size': cfg.Data.test_dataloader.batch_size,
-                'test_num_workers': cfg.Data.test_dataloader.num_workers,
-                'dataset_name': cfg.Data.dataset_name,
-                'dataset_cfg': cfg.Data,}
-    dm = DataInterface(**DataInterface_dict)
+    # DataInterface_dict = {'train_batch_size': cfg.Data.train_dataloader.batch_size,
+    #             'train_num_workers': cfg.Data.train_dataloader.num_workers,
+    #             'test_batch_size': cfg.Data.test_dataloader.batch_size,
+    #             'test_num_workers': cfg.Data.test_dataloader.num_workers,
+    #             'dataset_name': cfg.Data.dataset_name,
+    #             'dataset_cfg': cfg.Data,}
+    # dm = DataInterface(**DataInterface_dict)
+    home = Path.cwd().parts[1]
+    DataInterface_dict = {
+                'data_root': cfg.Data.data_dir,
+                'label_path': cfg.Data.label_file,
+                'batch_size': cfg.Data.train_dataloader.batch_size,
+                'num_workers': cfg.Data.train_dataloader.num_workers,
+                'n_classes': cfg.Model.n_classes,
+                }
+    dm = MILDataModule(**DataInterface_dict)
+    
 
     #---->Define Model
     ModelInterface_dict = {'model': cfg.Model,
                             'loss': cfg.Loss,
                             'optimizer': cfg.Optimizer,
                             'data': cfg.Data,
-                            'log': cfg.log_path
+                            'log': cfg.log_path,
+                            'backbone': cfg.Model.backbone,
                             }
     model = ModelInterface(**ModelInterface_dict)
     
@@ -57,12 +69,18 @@ def main(cfg):
         logger=cfg.load_loggers,
         callbacks=cfg.callbacks,
         max_epochs= cfg.General.epochs,
+        min_epochs = 200,
         gpus=cfg.General.gpus,
-        amp_level=cfg.General.amp_level,  
+        # gpus = [4],
+        # strategy='ddp',
+        amp_backend='native',
+        # amp_level=cfg.General.amp_level,  
         precision=cfg.General.precision,  
         accumulate_grad_batches=cfg.General.grad_acc,
-        deterministic=True,
-        check_val_every_n_epoch=1,
+        # fast_dev_run = True,
+        
+        # deterministic=True,
+        check_val_every_n_epoch=10,
     )
 
     #---->train or test
@@ -83,7 +101,7 @@ if __name__ == '__main__':
 
     #---->update
     cfg.config = args.config
-    cfg.General.gpus = args.gpus
+    # cfg.General.gpus = args.gpus
     cfg.General.server = args.stage
     cfg.Data.fold = args.fold
 

@@ -47,7 +47,8 @@ class TransMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransMIL, self).__init__()
         self.pos_layer = PPEG(dim=512)
-        self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
+        self._fc1 = nn.Sequential(nn.Linear(512, 512), nn.ReLU())
+        # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         self.cls_token = nn.Parameter(torch.randn(1, 1, 512))
         self.n_classes = n_classes
         self.layer1 = TransLayer(dim=512)
@@ -56,11 +57,10 @@ class TransMIL(nn.Module):
         self._fc2 = nn.Linear(512, self.n_classes)
 
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs): #, **kwargs
 
         h = kwargs['data'].float() #[B, n, 1024]
-        
-        h = self._fc1(h) #[B, n, 512]
+        # h = self._fc1(h) #[B, n, 512]
         
         #---->pad
         H = h.shape[1]
@@ -86,15 +86,19 @@ class TransMIL(nn.Module):
         h = self.norm(h)[:,0]
 
         #---->predict
-        logits = self._fc2(h) #[B, n_classes]
+        logits = self._fc2(torch.sigmoid(h)) #[B, n_classes]
         Y_hat = torch.argmax(logits, dim=1)
         Y_prob = F.softmax(logits, dim = 1)
         results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
         return results_dict
 
 if __name__ == "__main__":
-    data = torch.randn((1, 6000, 1024)).cuda()
+    data = torch.randn((1, 6000, 512)).cuda()
     model = TransMIL(n_classes=2).cuda()
     print(model.eval())
     results_dict = model(data = data)
     print(results_dict)
+    logits = results_dict['logits']
+    Y_prob = results_dict['Y_prob']
+    Y_hat = results_dict['Y_hat']
+    # print(F.sigmoid(logits))
