@@ -5,7 +5,7 @@ General:
     amp_level: O2
     precision: 16 
     multi_gpu_mode: dp
-    gpus: [3]
+    gpus: [0]
     epochs: &epoch 500 
     grad_acc: 2
     frozen_bn: False
@@ -17,7 +17,7 @@ Data:
     dataset_name: custom
     data_shuffle: False
     data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
-    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_no_viral.json'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_no_other.json'
     fold: 1
     nfold: 4
 
@@ -31,8 +31,8 @@ Data:
 
 Model:
     name: TransMIL
-    n_classes: 4
-    backbone: resnet18
+    n_classes: 5
+    backbone: resnet50
 
 
 Optimizer:

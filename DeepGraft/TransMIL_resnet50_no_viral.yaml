@@ -5,11 +5,11 @@ General:
     amp_level: O2
     precision: 16 
     multi_gpu_mode: dp
-    gpus: [1]
-    epochs: &epoch 200 
+    gpus: [3]
+    epochs: &epoch 500 
     grad_acc: 2
     frozen_bn: False
-    patience: 200
+    patience: 50
     server: test #train #test
     log_path: logs/
 
@@ -17,8 +17,8 @@ Data:
     dataset_name: custom
     data_shuffle: False
     data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
-    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_bin.json'
-    fold: 0
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_no_viral.json'
+    fold: 1
     nfold: 4
 
     train_dataloader:
@@ -29,12 +29,10 @@ Data:
         batch_size: 1
         num_workers: 8
 
-        
-
 Model:
     name: TransMIL
-    n_classes: 2
-    backbone: simple
+    n_classes: 4
+    backbone: resnet50
 
 
 Optimizer:

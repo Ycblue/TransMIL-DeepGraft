@@ -8,6 +8,8 @@ from torchvision import transforms
 from .camel_dataloader import FeatureBagLoader
 from .custom_dataloader import HDF5MILDataloader
 from pathlib import Path
+from transformers import AutoFeatureExtractor
+from torchsampler import ImbalancedDatasetSampler
 
 class DataInterface(pl.LightningDataModule):
 
@@ -56,9 +58,10 @@ class DataInterface(pl.LightningDataModule):
                                                 train=True)
             a = int(len(dataset)* 0.8)
             b = int(len(dataset) - a)
-            print(a)
-            print(b)
-            self.train_dataset, self.val_dataset = random_split(dataset, [a, b])
+            # print(a)
+            # print(b)
+            self.train_dataset, self.val_dataset = random_split(dataset, [a, b]) # returns data.Subset
+
             # self.train_dataset = self.instancialize(state='train')
             # self.val_dataset = self.instancialize(state='val')
  
@@ -72,7 +75,7 @@ class DataInterface(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.train_batch_size, num_workers=self.train_num_workers, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.train_batch_size, num_workers=self.train_num_workers, shuffle=False)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.train_batch_size, num_workers=self.train_num_workers, shuffle=False)
@@ -106,7 +109,7 @@ class DataInterface(pl.LightningDataModule):
 
 class MILDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, *args, **kwargs):
+    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, backbone=None, *args, **kwargs):
         super().__init__()
         self.data_root = data_root
         self.label_path = label_path
@@ -121,41 +124,74 @@ class MILDataModule(pl.LightningDataModule):
         self.num_bags_test = 50
         self.seed = 1
 
+        self.backbone = backbone
         self.cache = True
+        self.fe_transform = None
 
 
     def setup(self, stage: Optional[str] = None) -> None:
-        # if self.n_classes == 2:
-        #     if stage in (None, 'fit'):
-        #         dataset = HDF5Dataset(self.data_root, mode='train', n_classes=self.n_classes)
-        #         a = int(len(dataset)* 0.8)
-        #         b = int(len(dataset) - a)
-        #         self.train_data, self.valid_data = random_split(dataset, [a, b])
-
-        #     if stage in (None, 'test'):
-        #         self.test_data = HDF5Dataset(self.data_root, mode='test', n_classes=self.n_classes)
-        # else:
         home = Path.cwd().parts[1]
-        # self.label_path = f'{home}/ylan/DeepGraft_project/code/split_debug.json'
-        # train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train_small.csv'
-        # test_csv = f'/{home}/ylan/DeepGraft_project/code/debug_test_small.csv'
-        
 
         if stage in (None, 'fit'):
-            dataset = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
-            # print(len(dataset))
+            dataset = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, backbone=self.backbone)
             a = int(len(dataset)* 0.8)
             b = int(len(dataset) - a)
             self.train_data, self.valid_data = random_split(dataset, [a, b])
 
         if stage in (None, 'test'):
-            self.test_data = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes)
+            self.test_data = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, backbone=self.backbone)
 
         return super().setup(stage=stage)
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data, self.batch_size, num_workers=self.num_workers, shuffle=True) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        return DataLoader(self.train_data,  self.batch_size, num_workers=self.num_workers, shuffle=True) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        #sampler=ImbalancedDatasetSampler(self.train_data)
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
     
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(self.test_data, batch_size = self.batch_size, num_workers=self.num_workers)
+    
+
+class DataModule(pl.LightningDataModule):
+
+    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, backbone=None, *args, **kwargs):
+        super().__init__()
+        self.data_root = data_root
+        self.label_path = label_path
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.image_size = 384
+        self.n_classes = n_classes
+        self.target_number = 9
+        self.mean_bag_length = 10
+        self.var_bag_length = 2
+        self.num_bags_train = 200
+        self.num_bags_test = 50
+        self.seed = 1
+
+        self.backbone = backbone
+        self.cache = True
+        self.fe_transform = None
+
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        home = Path.cwd().parts[1]
+        
+        if stage in (None, 'fit'):
+            dataset = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, backbone=self.backbone)
+            a = int(len(dataset)* 0.8)
+            b = int(len(dataset) - a)
+            self.train_data, self.valid_data = random_split(dataset, [a, b])
+
+        if stage in (None, 'test'):
+            self.test_data = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, backbone=self.backbone)
+
+        return super().setup(stage=stage)
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(self.train_data,  self.batch_size,  num_workers=self.num_workers, shuffle=False,) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        #sampler=ImbalancedDatasetSampler(self.train_data),
     def val_dataloader(self) -> DataLoader:
         return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
     

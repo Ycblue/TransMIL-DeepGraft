@@ -9,7 +9,7 @@ General:
     epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
-    patience: 200
+    patience: 50
     server: train #train #test
     log_path: logs/
 

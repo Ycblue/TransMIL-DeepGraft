@@ -17,7 +17,7 @@ Data:
     dataset_name: custom
     data_shuffle: False
     data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
-    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_no_viral.json'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_bt_PAS_tcmr_viral.json'
     fold: 1
     nfold: 4
 
@@ -31,8 +31,8 @@ Data:
 
 Model:
     name: TransMIL
-    n_classes: 4
-    backbone: resnet18
+    n_classes: 2
+    backbone: resnet50
 
 
 Optimizer:

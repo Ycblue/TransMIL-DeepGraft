@@ -13,6 +13,7 @@ from .hausdorff import HausdorffDTLoss, HausdorffERLoss
 from .lovasz_loss import LovaszSoftmax
 from .ND_Crossentropy import CrossentropyND, TopKLoss, WeightedCrossEntropyLoss,\
      WeightedCrossEntropyLossV2, DisPenalizedCE
+from .poly_loss import PolyLoss
 
 from pytorch_toolbelt import losses as L
 
@@ -22,7 +23,7 @@ def create_loss(args, w1=1.0, w2=0.5):
     # mode = args.base_loss #BINARY_MODE \MULTICLASS_MODE \MULTILABEL_MODE 
     loss = None
     if hasattr(nn, conf_loss): 
-        loss = getattr(nn, conf_loss)() 
+        loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
     #binary loss
     elif conf_loss == "focal":
         loss = L.BinaryFocalLoss()
@@ -46,6 +47,8 @@ def create_loss(args, w1=1.0, w2=0.5):
         loss = L.JointLoss(BCEWithLogitsLoss(), L.BinaryDiceLogLoss(), w1, w2)
     elif conf_loss == "reduced_focal":
         loss = L.BinaryFocalLoss(reduced=True)
+    elif conf_loss == "polyloss":
+        loss = PolyLoss(softmax=False)
     else:
         assert False and "Invalid loss"
         raise ValueError

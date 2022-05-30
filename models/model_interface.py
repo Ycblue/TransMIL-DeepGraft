@@ -12,18 +12,24 @@ from matplotlib import pyplot as plt
 from MyOptimizer import create_optimizer
 from MyLoss import create_loss
 from utils.utils import cross_entropy_torch
+from timm.loss import AsymmetricLossSingleLabel
+from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
 
 #---->
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
+from torch import optim as optim
 
 #---->
 import pytorch_lightning as pl
 from .vision_transformer import vit_small
 from torchvision import models
 from torchvision.models import resnet
+from transformers import AutoFeatureExtractor, ViTModel
+
+from captum.attr import LayerGradCam
 
 class ModelInterface(pl.LightningModule):
 
@@ -33,13 +39,17 @@ class ModelInterface(pl.LightningModule):
         self.save_hyperparameters()
         self.load_model()
         self.loss = create_loss(loss)
+        # self.asl = AsymmetricLossSingleLabel()
+        # self.loss = LabelSmoothingCrossEntropy(smoothing=0.1)
+        
+        # self.loss = 
         self.optimizer = optimizer
         self.n_classes = model.n_classes
         self.log_path = kargs['log']
 
         #---->acc
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
-        
+        # print(self.experiment)
         #---->Metrics
         if self.n_classes > 2: 
             self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes, average = 'weighted')
@@ -73,35 +83,12 @@ class ModelInterface(pl.LightningModule):
         #--->random
         self.shuffle = kargs['data'].data_shuffle
         self.count = 0
+        self.backbone = kargs['backbone']
 
         self.out_features = 512
         if kargs['backbone'] == 'dino':
-            #---> dino feature extractor
-            arch = 'vit_small'
-            patch_size = 16
-            n_last_blocks = 4
-            # num_labels = 1000
-            avgpool_patchtokens = False
-            home = Path.cwd().parts[1]
-
-            weight_path = f'/{home}/ylan/workspace/dino/output/Aachen_2/checkpoint.pth'
-            model = vit_small(patch_size, num_classes=0)
-            # model.eval()
-            # set_parameter_requires_grad(model, feature_extracting)
-            for param in model.parameters():
-                param.requires_grad = False
-            # print(model.embed_dim)
-            # embed_dim = model.embed_dim * (n_last_blocks + int(avgpool_patchtokens))
-            # model.eval()
-            # print(embed_dim)
-            linear = nn.Linear(model.embed_dim, self.out_features)
-            linear.weight.data.normal_(mean=0.0, std=0.01)
-            linear.bias.data.zero_()
-            
-            self.model_ft = nn.Sequential(
-                model,
-                linear, 
-            )
+            self.feature_extractor = AutoFeatureExtractor.from_pretrained('facebook/dino-vitb16')
+            self.model_ft = ViTModel.from_pretrained('facebook/dino-vitb16')
         elif kargs['backbone'] == 'resnet18':
             resnet18 = models.resnet18(pretrained=True)
             modules = list(resnet18.children())[:-1]
@@ -109,7 +96,6 @@ class ModelInterface(pl.LightningModule):
 
             res18 = nn.Sequential(
                 *modules,
-                
             )
             for param in res18.parameters():
                 param.requires_grad = False
@@ -118,7 +104,7 @@ class ModelInterface(pl.LightningModule):
                 nn.AdaptiveAvgPool2d(1),
                 View((-1, 512)),
                 nn.Linear(512, self.out_features),
-                nn.ReLU(),
+                nn.GELU(),
             )
         elif kargs['backbone'] == 'resnet50':
 
@@ -135,7 +121,17 @@ class ModelInterface(pl.LightningModule):
                 nn.AdaptiveAvgPool2d(1),
                 View((-1, 1024)),
                 nn.Linear(1024, self.out_features),
-                nn.ReLU()
+                # nn.GELU()
+            )
+        elif kargs['backbone'] == 'efficientnet':
+            efficientnet = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_efficientnet_widese_b0', pretrained=True)
+            for param in efficientnet.parameters():
+                param.requires_grad = False
+            # efn = list(efficientnet.children())[:-1]
+            efficientnet.classifier.fc = nn.Linear(1280, self.out_features)
+            self.model_ft = nn.Sequential(
+                efficientnet,
+                nn.GELU(),
             )
         elif kargs['backbone'] == 'simple': #mil-ab attention
             feature_extracting = False
@@ -151,21 +147,19 @@ class ModelInterface(pl.LightningModule):
                 nn.ReLU(),
             )
 
-    #---->remove v_num
-    # def get_progress_bar_dict(self):
-    #     # don't show the version number
-    #     items = super().get_progress_bar_dict()
-    #     items.pop("v_num", None)
-    #     return items
-
     def training_step(self, batch, batch_idx):
         #---->inference
+        
         data, label, _ = batch
         label = label.float()
-        data = data.squeeze(0)
+        data = data.squeeze(0).float()
+        # print(data)
         # print(data.shape)
-        features = self.model_ft(data)
-        
+        if self.backbone == 'dino':
+            features = self.model_ft(**data)
+            features = features.last_hidden_state
+        else:
+            features = self.model_ft(data)
         features = features.unsqueeze(0)
         # print(features.shape)
         # features = features.squeeze()
@@ -177,21 +171,28 @@ class ModelInterface(pl.LightningModule):
 
         #---->loss
         loss = self.loss(logits, label)
+        # loss = self.asl(logits, label.squeeze())
 
         #---->acc log
         # print(label)
-        Y_hat = int(Y_hat)
+        # Y_hat = int(Y_hat)
         # if self.n_classes == 2:
         #     Y = int(label[0][1])
         # else: 
         Y = torch.argmax(label)
             # Y = int(label[0])
         self.data[Y]["count"] += 1
-        self.data[Y]["correct"] += (Y_hat == Y)
+        self.data[Y]["correct"] += (int(Y_hat) == Y)
 
-        return {'loss': loss} 
+        return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': label} 
 
     def training_epoch_end(self, training_step_outputs):
+        # logits = torch.cat([x['logits'] for x in training_step_outputs], dim = 0)
+        probs = torch.cat([x['Y_prob'] for x in training_step_outputs])
+        max_probs = torch.stack([x['Y_hat'] for x in training_step_outputs])
+        # target = torch.stack([x['label'] for x in training_step_outputs], dim = 0)
+        target = torch.cat([x['label'] for x in training_step_outputs])
+        target = torch.argmax(target, dim=1)
         for c in range(self.n_classes):
             count = self.data[c]["count"]
             correct = self.data[c]["correct"]
@@ -202,12 +203,19 @@ class ModelInterface(pl.LightningModule):
             print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
 
+        # print('max_probs: ', max_probs)
+        # print('probs: ', probs)
+        if self.current_epoch % 10 == 0:
+            self.log_confusion_matrix(probs, target, stage='train')
+
+        self.log('Train/auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True)
+
     def validation_step(self, batch, batch_idx):
 
         data, label, _ = batch
 
         label = label.float()
-        data = data.squeeze(0)
+        data = data.squeeze(0).float()
         features = self.model_ft(data)
         features = features.unsqueeze(0)
 
@@ -224,20 +232,23 @@ class ModelInterface(pl.LightningModule):
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (Y_hat.item() == Y)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y}
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label}
 
 
     def validation_epoch_end(self, val_step_outputs):
         logits = torch.cat([x['logits'] for x in val_step_outputs], dim = 0)
-        probs = torch.cat([x['Y_prob'] for x in val_step_outputs], dim = 0)
+        # probs = torch.cat([x['Y_prob'] for x in val_step_outputs], dim = 0)
+        probs = torch.cat([x['Y_prob'] for x in val_step_outputs])
         max_probs = torch.stack([x['Y_hat'] for x in val_step_outputs])
-        target = torch.stack([x['label'] for x in val_step_outputs], dim = 0)
+        # target = torch.stack([x['label'] for x in val_step_outputs], dim = 0)
+        target = torch.cat([x['label'] for x in val_step_outputs])
+        target = torch.argmax(target, dim=1)
         #---->
         # logits = logits.long()
         # target = target.squeeze().long()
         # logits = logits.squeeze(0)
         self.log('val_loss', cross_entropy_torch(logits, target), prog_bar=True, on_epoch=True, logger=True)
-        self.log('auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True)
+        self.log('val_auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True)
 
         # print(max_probs.squeeze(0).shape)
         # print(target.shape)
@@ -245,12 +256,8 @@ class ModelInterface(pl.LightningModule):
                           on_epoch = True, logger = True)
 
         #----> log confusion matrix
-        confmat = self.confusion_matrix(max_probs.squeeze(), target)
-        df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
-        plt.figure()
-        fig_ = sns.heatmap(df_cm, annot=True, cmap='Spectral').get_figure()
-        plt.close(fig_)
-        self.logger[0].experiment.add_figure('Confusion matrix', fig_, self.current_epoch)
+        self.log_confusion_matrix(probs, target, stage='val')
+        
 
         #---->acc log
         for c in range(self.n_classes):
@@ -267,18 +274,12 @@ class ModelInterface(pl.LightningModule):
         if self.shuffle == True:
             self.count = self.count+1
             random.seed(self.count*50)
-    
-
-
-    def configure_optimizers(self):
-        optimizer = create_optimizer(self.optimizer, self.model)
-        return [optimizer]
 
     def test_step(self, batch, batch_idx):
 
         data, label, _ = batch
         label = label.float()
-        data = data.squeeze(0)
+        data = data.squeeze(0).float()
         features = self.model_ft(data)
         features = features.unsqueeze(0)
 
@@ -292,12 +293,14 @@ class ModelInterface(pl.LightningModule):
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (Y_hat.item() == Y)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y}
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label}
 
     def test_epoch_end(self, output_results):
-        probs = torch.cat([x['Y_prob'] for x in output_results], dim = 0)
+        probs = torch.cat([x['Y_prob'] for x in output_results])
         max_probs = torch.stack([x['Y_hat'] for x in output_results])
-        target = torch.stack([x['label'] for x in output_results], dim = 0)
+        # target = torch.stack([x['label'] for x in output_results], dim = 0)
+        target = torch.cat([x['label'] for x in output_results])
+        target = torch.argmax(target, dim=1)
         
         #---->
         auc = self.AUROC(probs, target.squeeze())
@@ -326,18 +329,15 @@ class ModelInterface(pl.LightningModule):
             print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
 
-        confmat = self.confusion_matrix(max_probs.squeeze(), target)
-        df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
-        plt.figure()
-        fig_ = sns.heatmap(df_cm, annot=True, cmap='Spectral').get_figure()
-        # plt.close(fig_)
-        # self.logger[0].experiment.add_figure('Confusion matrix', fig_, self.current_epoch)
-        plt.savefig(f'{self.log_path}/cm_test')
-        plt.close(fig_)
-
+        self.log_confusion_matrix(probs, target, stage='test')
         #---->
         result = pd.DataFrame([metrics])
         result.to_csv(self.log_path / 'result.csv')
+
+    def configure_optimizers(self):
+        # optimizer_ft = optim.Adam(self.model_ft.parameters(), lr=self.optimizer.lr*0.1)
+        optimizer = create_optimizer(self.optimizer, self.model)
+        return optimizer     
 
 
     def load_model(self):
@@ -350,6 +350,7 @@ class ModelInterface(pl.LightningModule):
         else:
             camel_name = name
         try:
+                
             Model = getattr(importlib.import_module(
                 f'models.{name}'), camel_name)
         except:
@@ -371,6 +372,20 @@ class ModelInterface(pl.LightningModule):
         args1.update(other_args)
         return Model(**args1)
 
+    def log_confusion_matrix(self, max_probs, target, stage):
+        confmat = self.confusion_matrix(max_probs.squeeze(), target)
+        df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
+        plt.figure()
+        fig_ = sns.heatmap(df_cm, annot=True, cmap='Spectral').get_figure()
+        # plt.close(fig_)
+        # plt.savefig(f'{self.log_path}/cm_e{self.current_epoch}')
+        self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
+
+        if stage == 'test':
+            plt.savefig(f'{self.log_path}/cm_test')
+        plt.close(fig_)
+        # self.logger[0].experiment.add_figure('Confusion matrix', fig_, self.current_epoch)
+
 class View(nn.Module):
     def __init__(self, shape):
         super().__init__()
@@ -384,3 +399,4 @@ class View(nn.Module):
         # shape = (batch_size, *self.shape)
         out = input.view(*self.shape)
         return out
+

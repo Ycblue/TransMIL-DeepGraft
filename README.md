@@ -9,3 +9,7 @@ python train.py --stage='train' --config='Camelyon/TransMIL.yaml'  --gpus=0 --fo
 ```python
 python train.py --stage='test' --config='Camelyon/TransMIL.yaml'  --gpus=0 --fold=0
 ```
+
+
+### Changes Made: 
+
