@@ -2,14 +2,24 @@ import inspect # 查看python 类的参数和模块、函数代码
 import importlib # In order to dynamically import the library
 from typing import Optional
 import pytorch_lightning as pl
+from pytorch_lightning.loops.base import Loop
+from pytorch_lightning.loops.fit_loop import FitLoop
+
 from torch.utils.data import random_split, DataLoader
+from torch.utils.data.dataset import Dataset, Subset
 from torchvision.datasets import MNIST
 from torchvision import transforms
 from .camel_dataloader import FeatureBagLoader
 from .custom_dataloader import HDF5MILDataloader
+from .custom_jpg_dataloader import JPGMILDataloader
 from pathlib import Path
 from transformers import AutoFeatureExtractor
 from torchsampler import ImbalancedDatasetSampler
+
+from abc import ABC, abstractclassmethod, abstractmethod
+from sklearn.model_selection import KFold
+
+
 
 class DataInterface(pl.LightningDataModule):
 
@@ -109,7 +119,7 @@ class DataInterface(pl.LightningDataModule):
 
 class MILDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, backbone=None, *args, **kwargs):
+    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=50, n_classes=2, cache: bool=True, *args, **kwargs):
         super().__init__()
         self.data_root = data_root
         self.label_path = label_path
@@ -124,27 +134,29 @@ class MILDataModule(pl.LightningDataModule):
         self.num_bags_test = 50
         self.seed = 1
 
-        self.backbone = backbone
         self.cache = True
         self.fe_transform = None
+        
 
 
     def setup(self, stage: Optional[str] = None) -> None:
         home = Path.cwd().parts[1]
 
         if stage in (None, 'fit'):
-            dataset = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, backbone=self.backbone)
+            dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
             a = int(len(dataset)* 0.8)
             b = int(len(dataset) - a)
             self.train_data, self.valid_data = random_split(dataset, [a, b])
 
         if stage in (None, 'test'):
-            self.test_data = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, backbone=self.backbone)
+            self.test_data = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, data_cache_size=1)
 
         return super().setup(stage=stage)
 
+        
+
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data,  self.batch_size, num_workers=self.num_workers, shuffle=True) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data)
     def val_dataloader(self) -> DataLoader:
         return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
@@ -187,13 +199,92 @@ class DataModule(pl.LightningDataModule):
         if stage in (None, 'test'):
             self.test_data = HDF5MILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, backbone=self.backbone)
 
+
         return super().setup(stage=stage)
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data,  self.batch_size,  num_workers=self.num_workers, shuffle=False,) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        return DataLoader(self.train_data,  self.batch_size, shuffle=False,) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data),
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.valid_data, batch_size = self.batch_size)
+    
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(self.test_data, batch_size = self.batch_size) #, num_workers=self.num_workers
+
+
+class BaseKFoldDataModule(pl.LightningDataModule, ABC):
+    @abstractmethod
+    def setup_folds(self, num_folds: int) -> None:
+        pass
+
+    @abstractmethod
+    def setup_fold_index(self, fold_index: int) -> None:
+        pass
+
+class CrossVal_MILDataModule(BaseKFoldDataModule):
+
+    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, backbone=None, *args, **kwargs):
+        super().__init__()
+        self.data_root = data_root
+        self.label_path = label_path
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.image_size = 384
+        self.n_classes = n_classes
+        self.target_number = 9
+        self.mean_bag_length = 10
+        self.var_bag_length = 2
+        self.num_bags_train = 200
+        self.num_bags_test = 50
+        self.seed = 1
+
+        self.backbone = backbone
+        self.cache = True
+        self.fe_transform = None
+
+        # train_dataset: Optional[Dataset] = None
+        # test_dataset: Optional[Dataset] = None
+        # train_fold: Optional[Dataset] = None
+        # val_fold: Optional[Dataset] = None
+        self.train_data : Optional[Dataset] = None
+        self.test_data : Optional[Dataset] = None
+        self.train_fold : Optional[Dataset] = None
+        self.val_fold : Optional[Dataset] = None
+
+    def setup(self, stage: Optional[str] = None) -> None:
+        home = Path.cwd().parts[1]
+
+        # if stage in (None, 'fit'):
+        dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
+        # a = int(len(dataset)* 0.8)
+        # b = int(len(dataset) - a)
+        # self.train_data, self.val_data = random_split(dataset, [a, b])
+        self.train_data = dataset
+
+        # if stage in (None, 'test'):,
+        self.test_data = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes)
+
+        # return super().setup(stage=stage)
+
+    def setup_folds(self, num_folds: int) -> None:
+        self.num_folds = num_folds
+        self.splits = [split for split in KFold(num_folds).split(range(len(self.train_data)))]
+
+    def setup_fold_index(self, fold_index: int) -> None:
+        train_indices, val_indices = self.splits[fold_index]
+        self.train_fold = Subset(self.train_data, train_indices)
+        self.val_fold = Subset(self.train_data, val_indices)
+
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(self.train_fold,  self.batch_size, sampler=ImbalancedDatasetSampler(self.train_fold), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        # return DataLoader(self.train_fold,  self.batch_size, num_workers=self.num_workers, shuffle=True) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        #sampler=ImbalancedDatasetSampler(self.train_data)
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(self.val_fold, batch_size = self.batch_size, num_workers=self.num_workers)
     
     def test_dataloader(self) -> DataLoader:
         return DataLoader(self.test_data, batch_size = self.batch_size, num_workers=self.num_workers)
+
+
+

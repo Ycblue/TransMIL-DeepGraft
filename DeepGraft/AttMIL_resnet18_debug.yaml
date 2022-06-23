@@ -6,10 +6,10 @@ General:
     precision: 16 
     multi_gpu_mode: dp
     gpus: [1]
-    epochs: &epoch 200 
+    epochs: &epoch 1 
     grad_acc: 2
     frozen_bn: False
-    patience: 200
+    patience: 2
     server: test #train #test
     log_path: logs/
 
@@ -19,7 +19,8 @@ Data:
     data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     label_file: '/home/ylan/DeepGraft/training_tables/split_debug.json'
     fold: 0
-    nfold: 4
+    nfold: 2
+    cross_val: False
 
     train_dataloader:
         batch_size: 1 
@@ -32,9 +33,9 @@ Data:
         
 
 Model:
-    name: TransMIL
+    name: AttMIL
     n_classes: 2
-    backbone: resnet18
+    backbone: simple
 
 
 Optimizer:

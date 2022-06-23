@@ -7,6 +7,8 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 from matplotlib import pyplot as plt
+import cv2
+from PIL import Image
 
 #---->
 from MyOptimizer import create_optimizer
@@ -20,7 +22,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
+from torchmetrics.functional import stat_scores
 from torch import optim as optim
+# from sklearn.metrics import roc_curve, auc, roc_curve_score
+
 
 #---->
 import pytorch_lightning as pl
@@ -28,6 +33,10 @@ from .vision_transformer import vit_small
 from torchvision import models
 from torchvision.models import resnet
 from transformers import AutoFeatureExtractor, ViTModel
+
+from pytorch_grad_cam import GradCAM, EigenGradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from captum.attr import LayerGradCam
 
@@ -41,11 +50,20 @@ class ModelInterface(pl.LightningModule):
         self.loss = create_loss(loss)
         # self.asl = AsymmetricLossSingleLabel()
         # self.loss = LabelSmoothingCrossEntropy(smoothing=0.1)
-        
         # self.loss = 
+        # print(self.model)
+        
+        
+        # self.ecam = EigenGradCAM(model = self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform)
         self.optimizer = optimizer
         self.n_classes = model.n_classes
-        self.log_path = kargs['log']
+        print(self.n_classes)
+        self.save_path = kargs['log']
+        if Path(self.save_path).parts[3] == 'tcmr':
+            temp = list(Path(self.save_path).parts)
+            # print(temp)
+            temp[3] = 'tcmr_viral'
+            self.save_path = '/'.join(temp)
 
         #---->acc
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
@@ -53,6 +71,7 @@ class ModelInterface(pl.LightningModule):
         #---->Metrics
         if self.n_classes > 2: 
             self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes, average = 'weighted')
+            
             metrics = torchmetrics.MetricCollection([torchmetrics.Accuracy(num_classes = self.n_classes,
                                                                            average='micro'),
                                                      torchmetrics.CohenKappa(num_classes = self.n_classes),
@@ -67,6 +86,7 @@ class ModelInterface(pl.LightningModule):
                                                                             
         else : 
             self.AUROC = torchmetrics.AUROC(num_classes=2, average = 'weighted')
+
             metrics = torchmetrics.MetricCollection([torchmetrics.Accuracy(num_classes = 2,
                                                                            average = 'micro'),
                                                      torchmetrics.CohenKappa(num_classes = 2),
@@ -76,6 +96,8 @@ class ModelInterface(pl.LightningModule):
                                                                          num_classes = 2),
                                                      torchmetrics.Precision(average = 'macro',
                                                                             num_classes = 2)])
+        self.PRC = torchmetrics.PrecisionRecallCurve(num_classes = self.n_classes)
+        # self.pr_curve = torchmetrics.BinnedPrecisionRecallCurve(num_classes = self.n_classes, thresholds=10)
         self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes = self.n_classes)                                                                    
         self.valid_metrics = metrics.clone(prefix = 'val_')
         self.test_metrics = metrics.clone(prefix = 'test_')
@@ -146,28 +168,40 @@ class ModelInterface(pl.LightningModule):
                 nn.Linear(1024, self.out_features),
                 nn.ReLU(),
             )
+        # print(self.model_ft[0].features[-1])
+        # print(self.model_ft)
+        if model.name == 'TransMIL':
+            target_layers = [self.model.layer2.norm] # 32x32
+            # target_layers = [self.model_ft[0].features[-1]] # 32x32
+            self.cam = GradCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform) #, reshape_transform=self.reshape_transform
+            # self.cam_ft = GradCAM(model=self.model, target_layers = target_layers_ft, use_cuda=True) #, reshape_transform=self.reshape_transform
+        else:
+            target_layers = [self.model.attention_weights]
+            self.cam = GradCAM(model = self.model, target_layers = target_layers, use_cuda=True)
+
+    def forward(self, x):
+        
+        feats = self.model_ft(x).unsqueeze(0)
+        return self.model(feats)
+
+    def step(self, input):
+
+        input = input.squeeze(0).float()
+        logits = self(input) 
+
+        Y_hat = torch.argmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim=1)
+
+        return logits, Y_prob, Y_hat
 
     def training_step(self, batch, batch_idx):
         #---->inference
         
-        data, label, _ = batch
+
+        input, label, _= batch
         label = label.float()
-        data = data.squeeze(0).float()
-        # print(data)
-        # print(data.shape)
-        if self.backbone == 'dino':
-            features = self.model_ft(**data)
-            features = features.last_hidden_state
-        else:
-            features = self.model_ft(data)
-        features = features.unsqueeze(0)
-        # print(features.shape)
-        # features = features.squeeze()
-        results_dict = self.model(data=features) 
-        # results_dict = self.model(data=data, label=label)
-        logits = results_dict['logits']
-        Y_prob = results_dict['Y_prob']
-        Y_hat = results_dict['Y_hat']
+        
+        logits, Y_prob, Y_hat = self.step(input) 
 
         #---->loss
         loss = self.loss(logits, label)
@@ -183,6 +217,14 @@ class ModelInterface(pl.LightningModule):
             # Y = int(label[0])
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (int(Y_hat) == Y)
+        self.log('loss', loss, prog_bar=True, on_epoch=True, logger=True)
+
+        if self.current_epoch % 10 == 0:
+
+            grid = torchvision.utils.make_grid(images)
+        # log input images 
+        # self.loggers[0].experiment.add_figure(f'{stage}/input', , self.current_epoch)
+
 
         return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': label} 
 
@@ -212,18 +254,10 @@ class ModelInterface(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        data, label, _ = batch
-
+        input, label, _ = batch
         label = label.float()
-        data = data.squeeze(0).float()
-        features = self.model_ft(data)
-        features = features.unsqueeze(0)
-
-        results_dict = self.model(data=features)
-        logits = results_dict['logits']
-        Y_prob = results_dict['Y_prob']
-        Y_hat = results_dict['Y_hat']
-
+        
+        logits, Y_prob, Y_hat = self.step(input) 
 
         #---->acc log
         # Y = int(label[0][1])
@@ -237,18 +271,23 @@ class ModelInterface(pl.LightningModule):
 
     def validation_epoch_end(self, val_step_outputs):
         logits = torch.cat([x['logits'] for x in val_step_outputs], dim = 0)
-        # probs = torch.cat([x['Y_prob'] for x in val_step_outputs], dim = 0)
         probs = torch.cat([x['Y_prob'] for x in val_step_outputs])
         max_probs = torch.stack([x['Y_hat'] for x in val_step_outputs])
-        # target = torch.stack([x['label'] for x in val_step_outputs], dim = 0)
         target = torch.cat([x['label'] for x in val_step_outputs])
         target = torch.argmax(target, dim=1)
         #---->
         # logits = logits.long()
         # target = target.squeeze().long()
         # logits = logits.squeeze(0)
+        if len(target.unique()) != 1:
+            self.log('val_auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True)
+        else:    
+            self.log('val_auc', 0.0, prog_bar=True, on_epoch=True, logger=True)
+
+        
+
         self.log('val_loss', cross_entropy_torch(logits, target), prog_bar=True, on_epoch=True, logger=True)
-        self.log('val_auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True)
+        
 
         # print(max_probs.squeeze(0).shape)
         # print(target.shape)
@@ -276,24 +315,61 @@ class ModelInterface(pl.LightningModule):
             random.seed(self.count*50)
 
     def test_step(self, batch, batch_idx):
-
-        data, label, _ = batch
+        torch.set_grad_enabled(True)
+        data, label, name = batch
         label = label.float()
+        # logits, Y_prob, Y_hat = self.step(data) 
+        # print(data.shape)
         data = data.squeeze(0).float()
-        features = self.model_ft(data)
-        features = features.unsqueeze(0)
+        logits = self(data).detach() 
 
-        results_dict = self.model(data=features, label=label)
-        logits = results_dict['logits']
-        Y_prob = results_dict['Y_prob']
-        Y_hat = results_dict['Y_hat']
+        Y = torch.argmax(label)
+        Y_hat = torch.argmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim = 1)
+        
+        #----> Get Topk tiles 
+
+        target = [ClassifierOutputTarget(Y)]
+
+        data_ft = self.model_ft(data).unsqueeze(0).float()
+        # data_ft = self.model_ft(data).unsqueeze(0).float()
+        # print(data_ft.shape)
+        # print(target)
+        grayscale_cam = self.cam(input_tensor=data_ft, targets=target)
+        # grayscale_ecam = self.ecam(input_tensor=data_ft, targets=target)
+
+        # print(grayscale_cam)
+
+        summed = torch.mean(torch.Tensor(grayscale_cam), dim=2)
+        print(summed)
+        print(summed.shape)
+        topk_tiles, topk_indices = torch.topk(summed.squeeze(0), 5, dim=0)
+        topk_data = data[topk_indices].detach()
+        
+        # target_ft = 
+        # grayscale_cam_ft = self.cam_ft(input_tensor=data, )
+        # for i in range(data.shape[0]):
+            
+            # vis_img = data[i, :, :, :].cpu().numpy()
+            # vis_img = np.transpose(vis_img, (1,2,0))
+            # print(vis_img.shape)
+            # cam_img = grayscale_cam.squeeze(0)
+        # cam_img = self.reshape_transform(grayscale_cam)
+
+        # print(cam_img.shape)
+            
+            # visualization = show_cam_on_image(vis_img, cam_img, use_rgb=True)
+            # visualization = ((visualization/visualization.max())*255.0).astype(np.uint8)
+            # print(visualization)
+        # cv2.imwrite(f'{test_path}/{Y}/{name}/gradcam.jpg', cam_img)
 
         #---->acc log
         Y = torch.argmax(label)
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (Y_hat.item() == Y)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label}
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': name, 'topk_data': topk_data} #
+        # return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': name} #, 'topk_data': topk_data
 
     def test_epoch_end(self, output_results):
         probs = torch.cat([x['Y_prob'] for x in output_results])
@@ -301,7 +377,8 @@ class ModelInterface(pl.LightningModule):
         # target = torch.stack([x['label'] for x in output_results], dim = 0)
         target = torch.cat([x['label'] for x in output_results])
         target = torch.argmax(target, dim=1)
-        
+        patients = [x['name'] for x in output_results]
+        topk_tiles = [x['topk_data'] for x in output_results]
         #---->
         auc = self.AUROC(probs, target.squeeze())
         metrics = self.test_metrics(max_probs.squeeze() , target)
@@ -312,9 +389,41 @@ class ModelInterface(pl.LightningModule):
 
         # self.log('auc', auc, prog_bar=True, on_epoch=True, logger=True)
 
-        # print(max_probs.squeeze(0).shape)
-        # print(target.shape)
-        # self.log_dict(metrics, logger = True)
+        #---->get highest scoring patients for each class
+        test_path = Path(self.save_path) / 'most_predictive'
+        topk, topk_indices = torch.topk(probs.squeeze(0), 5, dim=0)
+        for n in range(self.n_classes):
+            print('class: ', n)
+            topk_patients = [patients[i[n]] for i in topk_indices]
+            topk_patient_tiles = [topk_tiles[i[n]] for i in topk_indices]
+            for x, p, t in zip(topk, topk_patients, topk_patient_tiles):
+                print(p, x[n])
+                patient = p[0]
+                outpath = test_path / str(n) / patient 
+                outpath.mkdir(parents=True, exist_ok=True)
+                for i in range(len(t)):
+                    tile = t[i]
+                    tile = tile.cpu().numpy().transpose(1,2,0)
+                    tile = (tile - tile.min())/ (tile.max() - tile.min()) * 255
+                    tile = tile.astype(np.uint8)
+                    img = Image.fromarray(tile)
+                    
+                    img.save(f'{test_path}/{n}/{patient}/{i}_gradcam.jpg')
+
+            
+            
+        #----->visualize top predictive tiles
+        
+        
+
+        
+                # img = img.squeeze(0).cpu().numpy()
+                # img = np.transpose(img, (1,2,0))
+                # # print(img)
+                # # print(grayscale_cam.shape)
+                # visualization = show_cam_on_image(img, grayscale_cam, use_rgb=True)
+
+
         for keys, values in metrics.items():
             print(f'{keys} = {values}')
             metrics[keys] = values.cpu().numpy()
@@ -329,16 +438,35 @@ class ModelInterface(pl.LightningModule):
             print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
 
+        #---->plot auroc curve
+        # stats = stat_scores(probs, target, reduce='macro', num_classes=self.n_classes)
+        # fpr = {}
+        # tpr = {}
+        # for n in self.n_classes: 
+
+        # fpr, tpr, thresh = roc_curve(target.cpu().numpy(), probs.cpu().numpy())
+        #[tp, fp, tn, fn, tp+fn]
+
+
         self.log_confusion_matrix(probs, target, stage='test')
         #---->
         result = pd.DataFrame([metrics])
-        result.to_csv(self.log_path / 'result.csv')
+        result.to_csv(Path(self.save_path) / f'test_result.csv', mode='a', header=not Path(self.save_path).exists())
+
+        # with open(f'{self.save_path}/test_metrics.txt', 'a') as f:
+
+        #     f.write([metrics])
 
     def configure_optimizers(self):
         # optimizer_ft = optim.Adam(self.model_ft.parameters(), lr=self.optimizer.lr*0.1)
         optimizer = create_optimizer(self.optimizer, self.model)
         return optimizer     
 
+    def reshape_transform(self, tensor, h=32, w=32):
+        result = tensor[:, 1:, :].reshape(tensor.size(0), h, w, tensor.size(2))
+        result = result.transpose(2,3).transpose(1,2)
+        # print(result.shape)
+        return result
 
     def load_model(self):
         name = self.hparams.model.name
@@ -372,18 +500,33 @@ class ModelInterface(pl.LightningModule):
         args1.update(other_args)
         return Model(**args1)
 
+    def log_image(self, tensor, stage, name):
+        
+        tile = tile.cpu().numpy().transpose(1,2,0)
+        tile = (tile - tile.min())/ (tile.max() - tile.min()) * 255
+        tile = tile.astype(np.uint8)
+        img = Image.fromarray(tile)
+        self.loggers[0].experiment.add_figure(f'{stage}/{name}', img, self.current_epoch)
+
+
     def log_confusion_matrix(self, max_probs, target, stage):
         confmat = self.confusion_matrix(max_probs.squeeze(), target)
+        print(confmat)
         df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
-        plt.figure()
+        # plt.figure()
         fig_ = sns.heatmap(df_cm, annot=True, cmap='Spectral').get_figure()
         # plt.close(fig_)
-        # plt.savefig(f'{self.log_path}/cm_e{self.current_epoch}')
-        self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
+        # plt.savefig(f'{self.save_path}/cm_e{self.current_epoch}')
+        
 
-        if stage == 'test':
-            plt.savefig(f'{self.log_path}/cm_test')
-        plt.close(fig_)
+        if stage == 'train':
+            # print(self.save_path)
+            # plt.savefig(f'{self.save_path}/cm_test')
+
+            self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
+        else:
+            fig_.savefig(f'{self.save_path}/cm_test.png', dpi=400)
+        # plt.close(fig_)
         # self.logger[0].experiment.add_figure('Confusion matrix', fig_, self.current_epoch)
 
 class View(nn.Module):

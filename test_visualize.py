@@ -21,14 +21,12 @@ def make_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--stage', default='train', type=str)
     parser.add_argument('--config', default='DeepGraft/TransMIL.yaml',type=str)
-    parser.add_argument('--version', default=2,type=int)
+    parser.add_argument('--version', default=0,type=int)
+    parser.add_argument('--epoch', default='0',type=str)
     parser.add_argument('--gpus', default = 2, type=int)
     parser.add_argument('--loss', default = 'CrossEntropyLoss', type=str)
     parser.add_argument('--fold', default = 0)
     parser.add_argument('--bag_size', default = 1024, type=int)
-    parser.add_argument('--resume_training', action='store_true')
-    # parser.add_argument('--ckpt_path', default = , type=str)
-    
 
     args = parser.parse_args()
     return args
@@ -42,21 +40,14 @@ def main(cfg):
     pl.seed_everything(cfg.General.seed)
 
     #---->load loggers
-    cfg.load_loggers = load_loggers(cfg)
+    # cfg.load_loggers = load_loggers(cfg)
+
     # print(cfg.load_loggers)
-    save_path = Path(cfg.load_loggers[0].log_dir) 
+    # save_path = Path(cfg.load_loggers[0].log_dir) 
 
     #---->load callbacks
-    cfg.callbacks = load_callbacks(cfg, save_path)
+    # cfg.callbacks = load_callbacks(cfg, save_path)
 
-    #---->Define Data 
-    # DataInterface_dict = {'train_batch_size': cfg.Data.train_dataloader.batch_size,
-    #             'train_num_workers': cfg.Data.train_dataloader.num_workers,
-    #             'test_batch_size': cfg.Data.test_dataloader.batch_size,
-    #             'test_num_workers': cfg.Data.test_dataloader.num_workers,
-    #             'dataset_name': cfg.Data.dataset_name,
-    #             'dataset_cfg': cfg.Data,}
-    # dm = DataInterface(**DataInterface_dict)
     home = Path.cwd().parts[1]
     DataInterface_dict = {
                 'data_root': cfg.Data.data_dir,
@@ -64,12 +55,11 @@ def main(cfg):
                 'batch_size': cfg.Data.train_dataloader.batch_size,
                 'num_workers': cfg.Data.train_dataloader.num_workers,
                 'n_classes': cfg.Model.n_classes,
+                'backbone': cfg.Model.backbone,
                 'bag_size': cfg.Data.bag_size,
                 }
 
-    if cfg.Data.cross_val:
-        dm = CrossVal_MILDataModule(**DataInterface_dict)
-    else: dm = MILDataModule(**DataInterface_dict)
+    dm = MILDataModule(**DataInterface_dict)
     
 
     #---->Define Model
@@ -85,8 +75,8 @@ def main(cfg):
     #---->Instantiate Trainer
     trainer = Trainer(
         num_sanity_val_steps=0, 
-        logger=cfg.load_loggers,
-        callbacks=cfg.callbacks,
+        # logger=cfg.load_loggers,
+        # callbacks=cfg.callbacks,
         max_epochs= cfg.General.epochs,
         min_epochs = 200,
         gpus=cfg.General.gpus,
@@ -103,35 +93,30 @@ def main(cfg):
     )
 
     #---->train or test
-    if cfg.resume_training:
-        last_ckpt = log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'last.ckpt'
-        trainer.fit(model = model, datamodule = dm, ckpt_path=last_ckpt)
+    log_path = cfg.log_path
+    # print(log_path)
+    # log_path = Path('lightning_logs/2/checkpoints')
+    model_paths = list(log_path.glob('*.ckpt'))
 
-    if cfg.General.server == 'train':
-
-        # k-fold cross validation loop
-        if cfg.Data.cross_val: 
-            internal_fit_loop = trainer.fit_loop
-            trainer.fit_loop = KFoldLoop(cfg.Data.nfold, export_path = cfg.log_path, **ModelInterface_dict)
-            trainer.fit_loop.connect(internal_fit_loop)
-            trainer.fit(model, dm)
-        else:
-            trainer.fit(model = model, datamodule = dm)
+    if cfg.epoch == 'last':
+        model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
     else:
-        log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' 
+        model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
 
-        test_path = Path(log_path) / 'test'
-        for n in range(cfg.Model.n_classes):
-            n_output_path = test_path / str(n)
-            n_output_path.mkdir(parents=True, exist_ok=True)
-        # print(cfg.log_path)
-        model_paths = list(log_path.glob('*.ckpt'))
-        model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
-        # model_paths = [f'{log_path}/epoch=279-val_loss=0.4009.ckpt']
-        for path in model_paths:
-            print(path)
-            new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
-            trainer.test(model=new_model, datamodule=dm)
+    # model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
+    # model_paths = [f'lightning_logs/0/.ckpt']
+    # model_paths = [f'{log_path}/last.ckpt']
+    if not model_paths: 
+        print('No Checkpoints vailable!')
+    for path in model_paths:
+        # with open(f'{log_path}/test_metrics.txt', 'w') as f:
+        #     f.write(str(path) + '\n')
+        print(path)
+        new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        trainer.test(model=new_model, datamodule=dm)
+    
+    # Top 5 scoring patches for patient
+    # GradCam
 
 
 if __name__ == '__main__':
@@ -147,14 +132,14 @@ if __name__ == '__main__':
     cfg.Loss.base_loss = args.loss
     cfg.Data.bag_size = args.bag_size
     cfg.version = args.version
+    cfg.epoch = args.epoch
 
     log_path = Path(cfg.General.log_path) / str(Path(cfg.config).parent)
     Path(cfg.General.log_path).mkdir(exist_ok=True, parents=True)
     log_name =  f'_{cfg.Model.backbone}' + f'_{cfg.Loss.base_loss}'
     task = '_'.join(Path(cfg.config).name[:-5].split('_')[2:])
     # task = Path(cfg.config).name[:-5].split('_')[2:][0]
-    cfg.log_path = log_path / f'{cfg.Model.name}' / task / log_name 
-    
+    cfg.log_path = log_path / f'{cfg.Model.name}' / task / log_name / 'lightning_logs' / f'version_{cfg.version}' / 'checkpoints'
     
     
 
