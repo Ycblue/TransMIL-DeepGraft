@@ -6,21 +6,21 @@ General:
     precision: 16 
     multi_gpu_mode: dp
     gpus: [0]
-    epochs: &epoch 200 
+    epochs: &epoch 500 
     grad_acc: 2
     frozen_bn: False
     patience: 50
     server: test #train #test
-    log_path: logs/
+    log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
-    label_file: '/home/ylan/DeepGraft/training_tables/split_bt_PAS_tcmr_viral.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_128um/'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_tcmr_viral.json'
     fold: 1
     nfold: 3
-    cross_val: True
+    cross_val: False
 
     train_dataloader:
         batch_size: 1 
@@ -34,6 +34,8 @@ Model:
     name: TransMIL
     n_classes: 2
     backbone: resnet50
+    in_features: 512
+    out_features: 512
 
 
 Optimizer:
@@ -42,8 +44,9 @@ Optimizer:
     opt_eps: null 
     opt_betas: null
     momentum: null 
-    weight_decay: 0.00001
+    weight_decay: 0.01
 
 Loss:
     base_loss: CrossEntropyLoss
+    loss_weight: [1., 1.]
 

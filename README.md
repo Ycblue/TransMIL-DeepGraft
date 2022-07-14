@@ -13,3 +13,26 @@ python train.py --stage='test' --config='Camelyon/TransMIL.yaml'  --gpus=0 --fol
 
 ### Changes Made: 
 
+### Baseline: 
+
+lr = 0.0002
+wd = 0.01
+
+| task        | main | backbone | train_auc | val_auc | epochs | version |  
+|---|---|---|---|---|
+| tcmr_viral | TransMIL | resnet50 |  0.997 | 0.871 | 200 | 4 |
+|            |          | resnet18 |  0.999 | 0.687 | 200 | 0 |
+|            |          | efficientnet | 0.99 | 0.76 | 200 | 107 |
+|            | DTFD     | resnet50 | 0.989 | 0.621 | 200 | 44 |
+|            | AttMIL   | simple | 0.513 | 0.518 | 200 | 50 |
+
+
+159	28639			0.9222221970558167	0.19437336921691895	0.5906432867050171	0.56540447473526	0.7159091234207153	0.8709122538566589	0.30908203125
+
+### Ablation
+
+image drop out: 
+tcmr_viral TCMR efficientnet: version 0
+
+wd incerease: 
+tcmr_viral TCMR efficientnet: version 110

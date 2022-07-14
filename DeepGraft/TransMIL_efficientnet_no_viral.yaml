@@ -11,15 +11,16 @@ General:
     frozen_bn: False
     patience: 20
     server: test #train #test
-    log_path: logs/
+    log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
+    data_dir: '/home/ylan/data/DeepGraft/256_256um/'
     label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_no_viral.json'
     fold: 1
     nfold: 4
+    cross_val: False
 
     train_dataloader:
         batch_size: 1 
