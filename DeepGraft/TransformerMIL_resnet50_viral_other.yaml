@@ -1,0 +1,52 @@
+General:
+    comment: 
+    seed: 2021
+    fp16: True
+    amp_level: O2
+    precision: 16 
+    multi_gpu_mode: dp
+    gpus: [0]
+    epochs: &epoch 500 
+    grad_acc: 2
+    frozen_bn: False
+    patience: 50
+    server: test #train #test
+    log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
+
+Data:
+    dataset_name: custom
+    data_shuffle: False
+    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
+    label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_HE_Jones_viral_other.json'
+    fold: 1
+    nfold: 3
+    cross_val: False
+
+    train_dataloader:
+        batch_size: 1 
+        num_workers: 4
+
+    test_dataloader:
+        batch_size: 1
+        num_workers: 4
+
+Model:
+    name: TransformerMIL
+    n_classes: 2
+    backbone: resnet50
+    in_features: 512
+    out_features: 512
+
+
+Optimizer:
+    opt: lookahead_radam
+    lr: 0.0002
+    opt_eps: null 
+    opt_betas: null
+    momentum: null 
+    weight_decay: 0.01
+
+Loss:
+    base_loss: CrossEntropyLoss
+    
+

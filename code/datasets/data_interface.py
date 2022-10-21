@@ -2,8 +2,8 @@ import inspect # 查看python 类的参数和模块、函数代码
 import importlib # In order to dynamically import the library
 from typing import Optional
 import pytorch_lightning as pl
-from pytorch_lightning.loops.base import Loop
-from pytorch_lightning.loops.fit_loop import FitLoop
+# from pytorch_lightning.loops.base import Loop
+# from pytorch_lightning.loops.fit_loop import FitLoop
 
 from torch.utils.data import random_split, DataLoader
 from torch.utils.data.dataset import Dataset, Subset
@@ -12,8 +12,9 @@ from torchvision import transforms
 from .camel_dataloader import FeatureBagLoader
 from .custom_dataloader import HDF5MILDataloader
 from .custom_jpg_dataloader import JPGMILDataloader
+from .zarr_feature_dataloader import ZarrFeatureBagLoader
 from pathlib import Path
-from transformers import AutoFeatureExtractor
+# from transformers import AutoFeatureExtractor
 from torchsampler import ImbalancedDatasetSampler
 
 from abc import ABC, abstractclassmethod, abstractmethod
@@ -119,13 +120,13 @@ class DataInterface(pl.LightningDataModule):
 
 class MILDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=50, n_classes=2, cache: bool=True, *args, **kwargs):
+    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, use_features=False, *args, **kwargs):
         super().__init__()
         self.data_root = data_root
         self.label_path = label_path
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.image_size = 384
+        self.image_size = 224
         self.n_classes = n_classes
         self.target_number = 9
         self.mean_bag_length = 10
@@ -134,8 +135,15 @@ class MILDataModule(pl.LightningDataModule):
         self.num_bags_test = 50
         self.seed = 1
 
-        self.cache = True
+
+        self.cache = cache
         self.fe_transform = None
+        if not use_features: 
+            self.base_dataloader = JPGMILDataloader
+        else: 
+            
+            self.base_dataloader = ZarrFeatureBagLoader
+            self.cache = True
         
 
 
@@ -143,19 +151,22 @@ class MILDataModule(pl.LightningDataModule):
         home = Path.cwd().parts[1]
 
         if stage in (None, 'fit'):
-            dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
+            dataset = self.base_dataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, cache=self.cache)
+            # dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
+            print(len(dataset))
             a = int(len(dataset)* 0.8)
             b = int(len(dataset) - a)
             self.train_data, self.valid_data = random_split(dataset, [a, b])
 
         if stage in (None, 'test'):
-            self.test_data = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, data_cache_size=1)
+            self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, data_cache_size=1)
 
         return super().setup(stage=stage)
 
         
 
     def train_dataloader(self) -> DataLoader:
+        # return DataLoader(self.train_data,  batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data)
     def val_dataloader(self) -> DataLoader:

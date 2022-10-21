@@ -3,6 +3,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from nystrom_attention import NystromAttention
+import models.ResNet as ResNet
+from pathlib import Path
+
+try:
+    import apex
+    apex_available=True
+except ModuleNotFoundError:
+    # Error handling
+    apex_available = False
+    pass
+
 
 
 class TransLayer(nn.Module):
@@ -38,9 +49,9 @@ class PPEG(nn.Module):
     def forward(self, x, H, W):
         B, _, C = x.shape
         cls_token, feat_token = x[:, 0], x[:, 1:]
-        cnn_feat = feat_token.transpose(1, 2).view(B, C, H, W)
+        cnn_feat = feat_token.transpose(1, 2).contiguous().view(B, C, H, W)
         x = self.proj(cnn_feat)+cnn_feat+self.proj1(cnn_feat)+self.proj2(cnn_feat)
-        x = x.flatten(2).transpose(1, 2)
+        x = x.flatten(2).transpose(1, 2).contiguous()
         x = torch.cat((cls_token.unsqueeze(1), x), dim=1)
         return x
 
@@ -48,21 +59,37 @@ class PPEG(nn.Module):
 class TransMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransMIL, self).__init__()
-        in_features = 512
-        out_features=512
+        in_features = 1024
+        out_features = 512
         self.pos_layer = PPEG(dim=out_features)
         self._fc1 = nn.Sequential(nn.Linear(in_features, out_features), nn.GELU())
         # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
+        if apex_available: 
+            norm_layer = apex.normalization.FusedLayerNorm
+            
+        else:
+            norm_layer = nn.LayerNorm
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
         self.n_classes = n_classes
-        self.layer1 = TransLayer(dim=out_features)
-        self.layer2 = TransLayer(dim=out_features)
-        self.norm = nn.LayerNorm(out_features)
+        self.layer1 = TransLayer(norm_layer=norm_layer, dim=out_features)
+        self.layer2 = TransLayer(norm_layer=norm_layer, dim=out_features)
+        # self.norm = nn.LayerNorm(out_features)
+        self.norm = norm_layer(out_features)
         self._fc2 = nn.Linear(out_features, self.n_classes)
+
+        # self.model_ft = ResNet.resnet50(num_classes=self.n_classes, mlp=False, two_branch=False, normlinear=True).to(self.device)
+        # home = Path.cwd().parts[1]
+        # # self.model_ft.fc = nn.Identity()
+        # # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+        # self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+        # for param in self.model_ft.parameters():
+        #     param.requires_grad = False
+        # self.model_ft.fc = nn.Linear(2048, self.in_features)
 
 
     def forward(self, x): #, **kwargs
 
+        # x = self.model_ft(x).unsqueeze(0)
         h = x.float() #[B, n, 1024]
         h = self._fc1(h) #[B, n, 512]
         
@@ -71,6 +98,8 @@ class TransMIL(nn.Module):
         H = h.shape[1]
         _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
         add_length = _H * _W - H
+
+        # print(h.shape)
         h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
         
 
@@ -102,7 +131,7 @@ class TransMIL(nn.Module):
         return logits, attn2
 
 if __name__ == "__main__":
-    data = torch.randn((1, 6000, 512)).cuda()
+    data = torch.randn((1, 6000, 1024)).cuda()
     model = TransMIL(n_classes=2).cuda()
     print(model.eval())
     logits, attn = model(data)

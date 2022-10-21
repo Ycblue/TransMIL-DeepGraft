@@ -9,6 +9,7 @@ from .dice_loss import GDiceLoss, GDiceLossV2, SSLoss, SoftDiceLoss,\
      IoULoss, TverskyLoss, FocalTversky_loss, AsymLoss, DC_and_CE_loss,\
          PenaltyGDiceLoss, DC_and_topk_loss, ExpLog_loss
 from .focal_loss import FocalLoss
+from .focal_loss_ori import FocalLoss_Ori
 from .hausdorff import HausdorffDTLoss, HausdorffERLoss
 from .lovasz_loss import LovaszSoftmax
 from .ND_Crossentropy import CrossentropyND, TopKLoss, WeightedCrossEntropyLoss,\
@@ -17,20 +18,22 @@ from .poly_loss import PolyLoss
 
 from pytorch_toolbelt import losses as L
 
-def create_loss(args, w1=1.0, w2=0.5):
+def create_loss(args, n_classes, w1=1.0, w2=0.5):
     conf_loss = args.base_loss
-    if args.loss_weight: 
-        weight = torch.tensor(args.loss_weight)
-    else: weight = None
+    # n_classes = args.model.n_classes
+    # if args.loss_weight: 
+    #     weight = torch.tensor(args.loss_weight)
+    # else: weight = None
     ### MulticlassJaccardLoss(classes=np.arange(11)
     # mode = args.base_loss #BINARY_MODE \MULTICLASS_MODE \MULTILABEL_MODE 
     loss = None
+    print(conf_loss)
     if hasattr(nn, conf_loss): 
-        loss = getattr(nn, conf_loss)(weight=weight, label_smoothing=0.5) 
+        loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
         # loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
     #binary loss
     elif conf_loss == "focal":
-        loss = L.BinaryFocalLoss()
+        loss = FocalLoss_Ori(n_classes)
     elif conf_loss == "jaccard":
         loss = L.BinaryJaccardLoss()
     elif conf_loss == "jaccard_log":

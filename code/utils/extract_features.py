@@ -19,6 +19,38 @@ def extract_features(input_dir, output_dir, model, batch_size):
     model = model.to(device)
     model.eval()
 
+
+
+    for bag_candidate_idx in range(total):
+        bag_candidate = bags_dataset[bag_candidate_idx]
+        bag_name = os.path.basename(os.path.normpath(bag_candidate))
+        print(bag_name)
+        print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
+        bag_base = bag_name.split('\\')[-1]
+        
+        if not os.path.exists(os.path.join(feat_dir, bag_base + '.pt')):
+            
+            print(bag_name)
+            
+            output_path = os.path.join(feat_dir, bag_name)
+            file_path = bag_candidate
+            print(file_path)
+            output_file_path = Compute_w_loader(file_path, output_path, 
+    												model = model, batch_size = batch_size, 
+    												verbose = 1, print_every = 20,
+    												target_patch_size = target_patch_size)
+                        
+            if os.path.exists (output_file_path):
+                file = h5py.File(output_file_path, "r")
+                features = file['features'][:]
+                
+                print('features size: ', features.shape)
+                print('coordinates size: ', file['coords'].shape)
+                
+                features = torch.from_numpy(features)
+                torch.save(features, os.path.join(feat_dir, bag_base+'.pt'))
+                file.close()
+
     
 
 

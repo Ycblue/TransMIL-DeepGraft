@@ -77,3 +77,4 @@ class AttMIL(nn.Module): #gated attention
         logits = self.classifier(M)
        
         return logits, A
+

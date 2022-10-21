@@ -11,7 +11,7 @@ General:
     frozen_bn: False
     patience: 20
     server: train #train #test
-    log_path: logs/
+    log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom

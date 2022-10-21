@@ -17,7 +17,7 @@ class TransLayer(nn.Module):
             num_landmarks = dim//2,    # number of landmarks
             pinv_iterations = 6,    # number of moore-penrose iterations for approximating pinverse. 6 was recommended by the paper
             residual = True,         # whether to do an extra residual with the value or not. supposedly faster convergence if turned on
-            dropout=0.25 #0.1
+            dropout=0.7 #0.1
         )
 
     def forward(self, x):
@@ -48,15 +48,15 @@ class PPEG(nn.Module):
 class TransformerMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransformerMIL, self).__init__()
-        in_features = 512
+        in_features = 1024
         out_features = 512
-        self.pos_layer = PPEG(dim=out_features)
+        # self.pos_layer = PPEG(dim=out_features)
         self._fc1 = nn.Sequential(nn.Linear(in_features, out_features), nn.GELU())
         # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
         self.n_classes = n_classes
         self.layer1 = TransLayer(dim=out_features)
-        self.layer2 = TransLayer(dim=out_features)
+        # self.layer2 = TransLayer(dim=out_features)
         self.norm = nn.LayerNorm(out_features)
         self._fc2 = nn.Linear(out_features, self.n_classes)
 
@@ -83,6 +83,8 @@ class TransformerMIL(nn.Module):
         #---->Translayer x1
         h, attn1 = self.layer1(h) #[B, N, 512]
 
+        
+
         # print('After first TransLayer: ', h.shape)
 
         #---->PPEG
@@ -99,6 +101,7 @@ class TransformerMIL(nn.Module):
 
         #---->predict
         logits = self._fc2(h) #[B, n_classes]
+        # return logits, attn2
         return logits, attn1
 
 if __name__ == "__main__":

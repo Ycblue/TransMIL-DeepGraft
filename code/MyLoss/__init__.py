@@ -6,6 +6,7 @@ from .dice_loss import GDiceLoss, GDiceLossV2, SSLoss, SoftDiceLoss,\
      IoULoss, TverskyLoss, FocalTversky_loss, AsymLoss, DC_and_CE_loss,\
          PenaltyGDiceLoss, DC_and_topk_loss, ExpLog_loss
 from .focal_loss import FocalLoss
+from .focal_loss_ori import FocalLoss_Ori
 from .hausdorff import HausdorffDTLoss, HausdorffERLoss
 from .lovasz_loss import LovaszSoftmax
 from .ND_Crossentropy import CrossentropyND, TopKLoss, WeightedCrossEntropyLoss,\

@@ -65,7 +65,7 @@ def load_loggers(cfg):
 
 
 #---->load Callback
-from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
+from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar, StochasticWeightAveraging
 from pytorch_lightning.callbacks.progress.rich_progress import RichProgressBarTheme
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
@@ -77,11 +77,11 @@ def load_callbacks(cfg, save_path):
     output_path.mkdir(exist_ok=True, parents=True)
 
     early_stop_callback = EarlyStopping(
-        monitor='val_loss',
+        monitor='val_auc',
         min_delta=0.00,
         patience=cfg.General.patience,
         verbose=True,
-        mode='min'
+        mode='max'
     )
 
     Mycallbacks.append(early_stop_callback)
@@ -106,7 +106,7 @@ def load_callbacks(cfg, save_path):
                                          filename = '{epoch:02d}-{val_loss:.4f}-{val_auc: .4f}',
                                          verbose = True,
                                          save_last = True,
-                                         save_top_k = 1,
+                                         save_top_k = 2,
                                          mode = 'min',
                                          save_weights_only = True))
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_auc',
@@ -114,9 +114,13 @@ def load_callbacks(cfg, save_path):
                                          filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}',
                                          verbose = True,
                                          save_last = True,
-                                         save_top_k = 1,
+                                         save_top_k = 2,
                                          mode = 'max',
                                          save_weights_only = True))
+    
+    swa = StochasticWeightAveraging(swa_lrs=1e-2)
+    Mycallbacks.append(swa)
+
     return Mycallbacks
 
 #---->val loss

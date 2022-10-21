@@ -3,30 +3,45 @@ ToDo: remove bag_size
 '''
 
 
+# from custom_resnet50 import resnet50_baseline
 import numpy as np
 from pathlib import Path
 import torch
 from torch.utils import data
-from torch.utils.data.dataloader import DataLoader
+from torch.utils.data import random_split, DataLoader
 from tqdm import tqdm
 import torchvision.transforms as transforms
 from PIL import Image
 import cv2
 import json
 import albumentations as A
+from albumentations.pytorch import ToTensorV2
 from imgaug import augmenters as iaa
 import imgaug as ia
 from torchsampler import ImbalancedDatasetSampler
 
 
+
 class RangeNormalization(object):
     def __call__(self, sample):
-        img = sample
-        return (img / 255.0 - 0.5) / 0.5
+
+        MEAN = 255 * torch.tensor([0.485, 0.456, 0.406])
+        STD = 255 * torch.tensor([0.229, 0.224, 0.225])
+
+        # x = torch.from_numpy(sample)
+        x = sample.type(torch.float32)
+        # x = x.permute(-1, 0, 1)
+        x = 2 * x / 255 - 1
+
+        # x = (x - MEAN[:, None, None])/ STD[:, None, None]
+
+        # 
+        
+        return x
 
 class JPGMILDataloader(data.Dataset):
     
-    def __init__(self, file_path, label_path, mode, n_classes, load_data=False, data_cache_size=10, max_bag_size=1296):
+    def __init__(self, file_path, label_path, mode, n_classes, cache=False, data_cache_size=100, max_bag_size=1000):
         super().__init__()
 
         self.data_info = []
@@ -42,15 +57,16 @@ class JPGMILDataloader(data.Dataset):
         self.max_bag_size = max_bag_size
         self.min_bag_size = 120
         self.empty_slides = []
+        self.corrupt_slides = []
         # self.label_file = label_path
         recursive = True
         
         # read labels and slide_path from csv
         with open(self.label_path, 'r') as f:
             temp_slide_label_dict = json.load(f)[mode]
+            print(len(temp_slide_label_dict))
             for (x, y) in temp_slide_label_dict:
                 x = Path(x).stem 
-
                 # x_complete_path = Path(self.file_path)/Path(x)
                 for cohort in Path(self.file_path).iterdir():
                     x_complete_path = Path(self.file_path) / cohort / 'BLOCKS' / Path(x)
@@ -60,12 +76,20 @@ class JPGMILDataloader(data.Dataset):
                             self.slideLabelDict[x] = y
                             self.files.append(x_complete_path)
                         else: self.empty_slides.append(x_complete_path)
-        # print(len(self.empty_slides))
-        # print(self.empty_slides)
+                    
 
+        print(f'Slides with bag size under {self.min_bag_size}: ', len(self.empty_slides))
+        # print(self.empty_slides)
+        # print(len(self.files))
+        # print(len(self.corrupt_slides))
+        # print(self.corrupt_slides)
+        home = Path.cwd().parts[1]
+        self.slide_patient_dict_path = f'/{home}/ylan/DeepGraft/training_tables/slide_patient_dict.json'
+        with open(self.slide_patient_dict_path, 'r') as f:
+            slide_patient_dict = json.load(f)
 
         for slide_dir in tqdm(self.files):
-            self._add_data_infos(str(slide_dir.resolve()), load_data)
+            self._add_data_infos(str(slide_dir.resolve()), cache, slide_patient_dict)
 
 
         self.resize_transforms = A.Compose([
@@ -90,7 +114,24 @@ class JPGMILDataloader(data.Dataset):
             ], name="MyOneOf")
 
         ], name="MyAug")
-
+        self.albu_transforms = A.Compose([
+            A.HueSaturationValue(hue_shift_limit=30, sat_shift_limit=30, always_apply=False, p=0.5),
+            A.ColorJitter(always_apply=False, p=0.5),
+            A.RandomGamma(gamma_limit=(80,120)),
+            A.Flip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            # A.OneOf([
+            #     A.ElasticTransform(alpha=150, sigma=20, alpha_affine=50),
+            #     A.Affine(
+            #         scale={'x': (0.95, 1.05), 'y': (0.95, 1.05)},
+            #         rotate=(-45, 45),
+            #         shear=(-4, 4),
+            #         cval=8,
+            #         )
+            # ]),
+            A.Normalize(),
+            ToTensorV2(),
+        ])
         # self.train_transforms = A.Compose([
         #     A.HueSaturationValue(hue_shift_limit=13, sat_shift_limit=2, val_shift_limit=0, always_apply=True, p=1.0),
         #     # A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=0, val_shift_limit=0, always_apply=False, p=0.5),
@@ -111,11 +152,13 @@ class JPGMILDataloader(data.Dataset):
         #     ToTensorV2(),
         # ])
         self.val_transforms = transforms.Compose([
-            # A.Normalize(),
-            # ToTensorV2(),
-            RangeNormalization(),
+            # 
             transforms.ToTensor(),
-
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+            # RangeNormalization(),
         ])
         self.img_transforms = transforms.Compose([    
             transforms.RandomHorizontalFlip(p=1),
@@ -130,7 +173,7 @@ class JPGMILDataloader(data.Dataset):
 
     def __getitem__(self, index):
         # get data
-        (batch, batch_names), label, name = self.get_data(index)
+        (batch, batch_names), label, name, patient = self.get_data(index)
         out_batch = []
         seq_img_d = self.train_transforms.to_deterministic()
         
@@ -139,10 +182,15 @@ class JPGMILDataloader(data.Dataset):
             # print(.shape)
             for img in batch: # expects numpy 
                 img = img.numpy().astype(np.uint8)
+                # img = self.albu_transforms(image=img)
+                # print(img)
                 # print(img.shape)
                 img = seq_img_d.augment_image(img)
-                img = self.val_transforms(img)
+                img = self.val_transforms(img.copy())
+                # print(img)
                 out_batch.append(img)
+                # img = self.albu_transforms(image=img)
+                # out_batch.append(img['image'])
 
         else:
             for img in batch:
@@ -154,6 +202,7 @@ class JPGMILDataloader(data.Dataset):
         #     # print(name)
         #     out_batch = torch.randn(self.bag_size,3,256,256)
         # else: 
+        # print(len(out_batch))
         out_batch = torch.stack(out_batch)
         # print(out_batch.shape)
         # out_batch = out_batch[torch.randperm(out_batch.shape[0])] #shuffle tiles within batch
@@ -165,19 +214,21 @@ class JPGMILDataloader(data.Dataset):
         label = torch.as_tensor(label)
         label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
         # print(out_batch)
-        return out_batch, label, (name, batch_names) #, name_batch
+        return out_batch, label, (name, batch_names, patient) #, name_batch
 
     def __len__(self):
         return len(self.data_info)
     
-    def _add_data_infos(self, file_path, load_data):
+    def _add_data_infos(self, file_path, cache, slide_patient_dict):
+
+        
         wsi_name = Path(file_path).stem
         if wsi_name in self.slideLabelDict:
             # if wsi_name[:2] != 'RU': #skip RU because of container problems in dataset
             label = self.slideLabelDict[wsi_name]
-            # print(wsi_name)
+            patient = slide_patient_dict[wsi_name]
             idx = -1
-            self.data_info.append({'data_path': file_path, 'label': label, 'name': wsi_name, 'cache_idx': idx})
+            self.data_info.append({'data_path': file_path, 'label': label, 'name': wsi_name, 'patient': patient,'cache_idx': idx})
 
     def _load_data(self, file_path):
         """Load data to the cache given the file
@@ -186,20 +237,13 @@ class JPGMILDataloader(data.Dataset):
         """
         wsi_batch = []
         name_batch = []
-        # print(wsi_batch)
-        # for tile_path in Path(file_path).iterdir():
-        #     print(tile_path)
         for tile_path in Path(file_path).iterdir():
-            # print(tile_path)
             img = np.asarray(Image.open(tile_path)).astype(np.uint8)
             img = torch.from_numpy(img)
-
-            # print(wsi_batch)
             wsi_batch.append(img)
             
             name_batch.append(tile_path.stem)
                 
-        # if wsi_batch:
         wsi_batch = torch.stack(wsi_batch)
         if len(wsi_batch.shape) < 4: 
             wsi_batch.unsqueeze(0)
@@ -213,6 +257,7 @@ class JPGMILDataloader(data.Dataset):
         #     print(wsi_batch.shape)
         if wsi_batch.size(0) > self.max_bag_size:
             wsi_batch, name_batch, _ = to_fixed_size_bag(wsi_batch, name_batch, self.max_bag_size)
+        wsi_batch, name_batch = self.data_dropout(wsi_batch, name_batch, drop_rate=0.1)
         idx = self._add_to_cache((wsi_batch,name_batch), file_path)
         file_idx = next(i for i,v in enumerate(self.data_info) if v['data_path'] == file_path)
         self.data_info[file_idx + idx]['cache_idx'] = idx
@@ -225,7 +270,7 @@ class JPGMILDataloader(data.Dataset):
             self.data_cache.pop(removal_keys[0])
             # remove invalid cache_idx
             # self.data_info = [{'data_path': di['data_path'], 'label': di['label'], 'shape': di['shape'], 'name': di['name'], 'cache_idx': -1} if di['data_path'] == removal_keys[0] else di for di in self.data_info]
-            self.data_info = [{'data_path': di['data_path'], 'label': di['label'], 'name': di['name'], 'cache_idx': -1} if di['data_path'] == removal_keys[0] else di for di in self.data_info]
+            self.data_info = [{'data_path': di['data_path'], 'label': di['label'], 'name': di['name'], 'patient':di['patient'], 'cache_idx': -1} if di['data_path'] == removal_keys[0] else di for di in self.data_info]
 
     def _add_to_cache(self, data, data_path):
         """Adds data to the cache and returns its index. There is one cache
@@ -269,9 +314,18 @@ class JPGMILDataloader(data.Dataset):
         cache_idx = self.data_info[i]['cache_idx']
         label = self.data_info[i]['label']
         name = self.data_info[i]['name']
+        patient = self.data_info[i]['patient']
+        
         # print(self.data_cache[fp][cache_idx])
-        return self.data_cache[fp][cache_idx], label, name
+        return self.data_cache[fp][cache_idx], label, name, patient
 
+    def data_dropout(self, bag, batch_names, drop_rate):
+        bag_size = bag.shape[0]
+        bag_idxs = torch.randperm(bag_size)[:int(bag_size*(1-drop_rate))]
+        bag_samples = bag[bag_idxs]
+        name_samples = [batch_names[i] for i in bag_idxs]
+
+        return bag_samples, name_samples
 
 
 class RandomHueSaturationValue(object):
@@ -318,7 +372,7 @@ def to_fixed_size_bag(bag, names, bag_size: int = 512):
 
     # zero-pad if we don't have enough samples
     # zero_padded = torch.cat((bag_samples,
-                            # torch.zeros(bag_size-bag_samples.shape[0], bag_samples.shape[1], bag_samples.shape[2], bag_samples.shape[3])))
+    #                         torch.zeros(bag_size-bag_samples.shape[0], bag_samples.shape[1], bag_samples.shape[2], bag_samples.shape[3])))
 
     return bag_samples, name_samples, min(bag_size, len(bag))
 
@@ -355,28 +409,45 @@ class RandomHueSaturationValue(object):
 if __name__ == '__main__':
     from pathlib import Path
     import os
+    import time
+    from fast_tensor_dl import FastTensorDataLoader
+    from custom_resnet50 import resnet50_baseline
+    
+    
 
     home = Path.cwd().parts[1]
     train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train.csv'
-    data_root = f'/{home}/ylan/data/DeepGraft/224_128um'
+    data_root = f'/{home}/ylan/data/DeepGraft/224_128um_v2'
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
-    label_path = f'/{home}/ylan/DeepGraft/training_tables/split_PAS_tcmr_viral.json'
+    label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
+    # label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_limit_20_split_PAS_HE_Jones_norm_rest.json'
     output_dir = f'/{data_root}/debug/augments'
     os.makedirs(output_dir, exist_ok=True)
 
     n_classes = 2
 
-    dataset = JPGMILDataloader(data_root, label_path=label_path, mode='train', load_data=False, n_classes=n_classes)
+    dataset = JPGMILDataloader(data_root, label_path=label_path, mode='train', cache=False, n_classes=n_classes)
+    a = int(len(dataset)* 0.8)
+    b = int(len(dataset) - a)
+    train_data, valid_data = random_split(dataset, [a, b])
     # print(dataset.dataset)
     # a = int(len(dataset)* 0.8)
     # b = int(len(dataset) - a)
     # train_ds, val_ds = torch.utils.data.random_split(dataset, [a, b])
-    dl = DataLoader(dataset, None, num_workers=1, shuffle=False)
+    # dl = FastTensorDataLoader(dataset, batch_size=1, shuffle=False)
+    dl = DataLoader(train_data, batch_size=1, num_workers=16, sampler=ImbalancedDatasetSampler(train_data), pin_memory=True)
     # print(len(dl))
     # dl = DataLoader(dataset, batch_size=1, sampler=ImbalancedDatasetSampler(dataset), num_workers=5)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    scaler = torch.cuda.amp.GradScaler()
 
+    model_ft = resnet50_baseline(pretrained=True)
+    for param in model_ft.parameters():
+        param.requires_grad = False
+    model_ft.to(device)
     
+
     
     # data = DataLoader(dataset, batch_size=1)
 
@@ -385,12 +456,27 @@ if __name__ == '__main__':
     #/home/ylan/DeepGraft/dataset/hdf5/256_256um_split/RU0248_PASD_jke_PASD_20200201_195900_BIG.hdf5
     c = 0
     label_count = [0] *n_classes
-    print(len(dl))
-    for item in dl: 
-        if c >= 5:
-            break
-        bag, label, (name, _) = item
-        label_count[torch.argmax(label)] += 1
+    # print(len(dl))
+    start = time.time()
+    for item in tqdm(dl): 
+
+        # if c >= 10:
+        #     break
+        bag, label, (name, batch_names, patient) = item
+        print(bag.shape)
+        print(len(batch_names))
+        bag = bag.squeeze(0).float().to(device)
+        label = label.to(device)
+        with torch.cuda.amp.autocast():
+            output = model_ft(bag)
+        c += 1
+    end = time.time()
+
+    print('Bag Time: ', end-start)
+        # print(label)
+        # print(name)
+        # print(patient)
+    #     label_count[torch.argmax(label)] += 1
         # print(name)
         # if name == 'RU0248_PASD_jke_PASD_20200201_195900_BIG':
         
@@ -414,23 +500,23 @@ if __name__ == '__main__':
     #     # bag = item[0]
     #     bag = bag.squeeze()
     #     original = original.squeeze()
-        output_path = Path(output_dir) / name
-        output_path.mkdir(exist_ok=True)
-        for i in range(bag.shape[0]):
-            img = bag[i, :, :, :]
-            img = img.squeeze()
+        # output_path = Path(output_dir) / name
+        # output_path.mkdir(exist_ok=True)
+        # for i in range(bag.shape[0]):
+        #     img = bag[i, :, :, :]
+        #     img = img.squeeze()
             
-            img = ((img-img.min())/(img.max() - img.min())) * 255
-            # print(img)
-            # print(img)
-            img = img.numpy().astype(np.uint8).transpose(1,2,0)
+        #     img = ((img-img.min())/(img.max() - img.min())) * 255
+        #     # print(img)
+        #     # print(img)
+        #     img = img.numpy().astype(np.uint8).transpose(1,2,0)
 
             
-            img = Image.fromarray(img)
-            img = img.convert('RGB')
-            img.save(f'{output_path}/{i}.png')
+        #     img = Image.fromarray(img)
+        #     img = img.convert('RGB')
+        #     img.save(f'{output_path}/{i}.png')
 
-        c += 1
+        # c += 1
             
     #         o_img = original[i,:,:,:]
     #         o_img = o_img.squeeze()

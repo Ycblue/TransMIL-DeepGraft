@@ -18,7 +18,7 @@ import pandas as pd
 import json
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from transformers import AutoFeatureExtractor
+# from transformers import AutoFeatureExtractor
 from imgaug import augmenters as iaa
 import imgaug as ia
 from torchsampler import ImbalancedDatasetSampler

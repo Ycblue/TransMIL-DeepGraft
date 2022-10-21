@@ -15,9 +15,12 @@ from PIL import Image
 from MyOptimizer import create_optimizer
 from MyLoss import create_loss
 from utils.utils import cross_entropy_torch
+from utils.custom_resnet50 import resnet50_baseline
+
 from timm.loss import AsymmetricLossSingleLabel
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
-
+from libauc.losses import AUCMLoss, AUCM_MultiLabel, CompositionalAUCLoss
+from libauc.optimizers import PESG, PDSCA
 #---->
 import torch
 import torch.nn as nn
@@ -25,6 +28,7 @@ import torch.nn.functional as F
 import torchmetrics
 from torchmetrics.functional import stat_scores
 from torch import optim as optim
+
 # from sklearn.metrics import roc_curve, auc, roc_curve_score
 
 
@@ -41,6 +45,22 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from captum.attr import LayerGradCam
+import models.ResNet as ResNet
+
+class FeatureExtractor(pl.LightningDataModule):
+    def __init__(self, model_name, n_classes):
+        self.n_classes = n_classes
+        
+        self.model_ft = ResNet.resnet50(num_classes=self.n_classes, mlp=False, two_branch=False, normlinear=True)
+        home = Path.cwd().parts[1]
+        self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+        # self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+        for param in self.model_ft.parameters():
+            param.requires_grad = False
+        self.model_ft.fc = nn.Linear(2048, self.out_features)
+
+    def forward(self,x):
+        return self.model_ft(x)
 
 class ModelInterface(pl.LightningModule):
 
@@ -48,17 +68,20 @@ class ModelInterface(pl.LightningModule):
     def __init__(self, model, loss, optimizer, **kargs):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
+        self.n_classes = model.n_classes
         self.load_model()
-        self.loss = create_loss(loss)
+        self.loss = create_loss(loss, model.n_classes)
+        # self.loss = AUCM_MultiLabel(num_classes = model.n_classes, device=self.device)
         # self.asl = AsymmetricLossSingleLabel()
         # self.loss = LabelSmoothingCrossEntropy(smoothing=0.1)
         # self.loss = 
         # print(self.model)
         self.model_name = model.name
         
+        
         # self.ecam = EigenGradCAM(model = self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform)
         self.optimizer = optimizer
-        self.n_classes = model.n_classes
+        
         self.save_path = kargs['log']
         if Path(self.save_path).parts[3] == 'tcmr':
             temp = list(Path(self.save_path).parts)
@@ -66,15 +89,20 @@ class ModelInterface(pl.LightningModule):
             temp[3] = 'tcmr_viral'
             self.save_path = '/'.join(temp)
 
+        # if kargs['task']:
+        #     self.task = kargs['task']
+        self.task = Path(self.save_path).parts[3]
+
+
         #---->acc
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
         # print(self.experiment)
         #---->Metrics
         if self.n_classes > 2: 
-            self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes, average = 'weighted')
+            self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes)
             
             metrics = torchmetrics.MetricCollection([torchmetrics.Accuracy(num_classes = self.n_classes,
-                                                                           average='micro'),
+                                                                           average='weighted'),
                                                      torchmetrics.CohenKappa(num_classes = self.n_classes),
                                                      torchmetrics.F1Score(num_classes = self.n_classes,
                                                                      average = 'macro'),
@@ -86,10 +114,11 @@ class ModelInterface(pl.LightningModule):
                                                                             num_classes = self.n_classes)])
                                                                             
         else : 
-            self.AUROC = torchmetrics.AUROC(num_classes=self.n_classes, average = 'weighted')
+            self.AUROC = torchmetrics.AUROC(num_classes=self.n_classes, average='weighted')
+            # self.AUROC = torchmetrics.AUROC(num_classes=self.n_classes, average = 'weighted')
 
             metrics = torchmetrics.MetricCollection([torchmetrics.Accuracy(num_classes = 2,
-                                                                           average = 'micro'),
+                                                                           average = 'weighted'),
                                                      torchmetrics.CohenKappa(num_classes = 2),
                                                      torchmetrics.F1Score(num_classes = 2,
                                                                      average = 'macro'),
@@ -109,11 +138,14 @@ class ModelInterface(pl.LightningModule):
         self.count = 0
         self.backbone = kargs['backbone']
 
-        self.out_features = 512
-        if kargs['backbone'] == 'dino':
+        self.out_features = 1024
+
+        if self.backbone == 'features':
+            self.model_ft = None
+        elif self.backbone == 'dino':
             self.feature_extractor = AutoFeatureExtractor.from_pretrained('facebook/dino-vitb16')
             self.model_ft = ViTModel.from_pretrained('facebook/dino-vitb16')
-        elif kargs['backbone'] == 'resnet18':
+        elif self.backbone == 'resnet18':
             self.model_ft = models.resnet18(pretrained=True)
             # modules = list(resnet18.children())[:-1]
             for param in self.model_ft.parameters():
@@ -132,12 +164,33 @@ class ModelInterface(pl.LightningModule):
             #     nn.Linear(512, self.out_features),
             #     nn.GELU(),
             # )
-        elif kargs['backbone'] == 'resnet50':
-
-            self.model_ft = models.resnet50(pretrained=True)    
+        elif self.backbone == 'retccl':
+            # import models.ResNet as ResNet
+            self.model_ft = ResNet.resnet50(num_classes=self.n_classes, mlp=False, two_branch=False, normlinear=True)
+            home = Path.cwd().parts[1]
+            # pre_model = 
+            # self.model_ft.fc = nn.Identity()
+            # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+            self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
             for param in self.model_ft.parameters():
                 param.requires_grad = False
             self.model_ft.fc = nn.Linear(2048, self.out_features)
+            
+            # self.model_ft = FeatureExtractor('retccl', self.n_classes)
+
+
+        elif self.backbone == 'resnet50':
+            
+            self.model_ft = resnet50_baseline(pretrained=True)
+            for param in self.model_ft.parameters():
+                param.requires_grad = False
+
+            # self.model_ft = models.resnet50(pretrained=True)
+            # for param in self.model_ft.parameters():
+            #     param.requires_grad = False
+            # self.model_ft.fc = nn.Linear(2048, self.out_features)
+
+
             # modules = list(resnet50.children())[:-3]
             # res50 = nn.Sequential(
             #     *modules,     
@@ -150,7 +203,9 @@ class ModelInterface(pl.LightningModule):
             #     nn.Linear(1024, self.out_features),
             #     # nn.GELU()
             # )
-        elif kargs['backbone'] == 'efficientnet':
+        # elif kargs
+            
+        elif self.backbone == 'efficientnet':
             efficientnet = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_efficientnet_widese_b0', pretrained=True)
             for param in efficientnet.parameters():
                 param.requires_grad = False
@@ -160,7 +215,7 @@ class ModelInterface(pl.LightningModule):
                 efficientnet,
                 nn.GELU(),
             )
-        elif kargs['backbone'] == 'simple': #mil-ab attention
+        elif self.backbone == 'simple': #mil-ab attention
             feature_extracting = False
             self.model_ft = nn.Sequential(
                 nn.Conv2d(3, 20, kernel_size=5),
@@ -176,15 +231,23 @@ class ModelInterface(pl.LightningModule):
         # print(self.model_ft[0].features[-1])
         # print(self.model_ft)
 
+    # def __build_
+
     def forward(self, x):
         # print(x.shape)
-        feats = self.model_ft(x).unsqueeze(0)
+        if self.model_ft:
+            feats = self.model_ft(x).unsqueeze(0)
+        else: 
+            feats = x.unsqueeze(0)
         return self.model(feats)
+        # return self.model(x)
 
     def step(self, input):
 
         input = input.squeeze(0).float()
-        logits, _ = self(input) 
+        logits, _ = self(input.contiguous()) 
+
+        
 
         Y_hat = torch.argmax(logits, dim=1)
         Y_prob = F.softmax(logits, dim=1)
@@ -196,7 +259,8 @@ class ModelInterface(pl.LightningModule):
         input, label, _= batch
 
         #random image dropout
-        # bag_size = 500
+
+        # bag_size = input.squeeze().shape[0] * 0.7
         # bag_idxs = torch.randperm(input.squeeze(0).shape[0])[:bag_size]
         # input = input.squeeze(0)[bag_idxs].unsqueeze(0)
 
@@ -218,20 +282,20 @@ class ModelInterface(pl.LightningModule):
             # Y = int(label[0])
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (int(Y_hat) == Y)
-        self.log('loss', loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1)
+        self.log('loss', loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
 
-        if self.current_epoch % 10 == 0:
+        # if self.current_epoch % 10 == 0:
 
-            # images = input.squeeze()[:10, :, :, :]
-            # for i in range(10):
-            img = input.squeeze(0)[:10, :, :, :]
-            img = (img - torch.min(img)/(torch.max(img)-torch.min(img)))*255.0
+        #     # images = input.squeeze()[:10, :, :, :]
+        #     # for i in range(10):
+        #     img = input.squeeze(0)[:10, :, :, :]
+        #     img = (img - torch.min(img)/(torch.max(img)-torch.min(img)))*255.0
             
-            # mg = img.cpu().numpy()
-            grid = torchvision.utils.make_grid(img, normalize=True, value_range=(0, 255), scale_each=True)
-            # grid = img.detach().cpu().numpy()
-        # log input images 
-            self.loggers[0].experiment.add_image(f'{self.current_epoch}/input', grid)
+        #     # mg = img.cpu().numpy()
+        #     grid = torchvision.utils.make_grid(img, normalize=True, value_range=(0, 255), scale_each=True)
+        #     # grid = img.detach().cpu().numpy()
+        # # log input images 
+        #     self.loggers[0].experiment.add_image(f'{self.current_epoch}/input', grid)
 
 
         return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': Y} 
@@ -243,14 +307,16 @@ class ModelInterface(pl.LightningModule):
         # target = torch.stack([x['label'] for x in training_step_outputs], dim = 0)
         target = torch.stack([x['label'] for x in training_step_outputs])
         # target = torch.argmax(target, dim=1)
-        for c in range(self.n_classes):
-            count = self.data[c]["count"]
-            correct = self.data[c]["correct"]
-            if count == 0: 
-                acc = None
-            else:
-                acc = float(correct) / count
-            print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
+
+        if self.current_epoch % 5 == 0:
+            for c in range(self.n_classes):
+                count = self.data[c]["count"]
+                correct = self.data[c]["correct"]
+                if count == 0: 
+                    acc = None
+                else:
+                    acc = float(correct) / count
+                print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
 
         # print('max_probs: ', max_probs)
@@ -258,7 +324,7 @@ class ModelInterface(pl.LightningModule):
         if self.current_epoch % 10 == 0:
             self.log_confusion_matrix(max_probs, target, stage='train')
 
-        self.log('Train/auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True)
+        self.log('Train/auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
     def validation_step(self, batch, batch_idx):
 
@@ -271,8 +337,10 @@ class ModelInterface(pl.LightningModule):
         # Y = int(label[0][1])
         Y = torch.argmax(label)
 
+        # print(Y_hat)
         self.data[Y]["count"] += 1
-        self.data[Y]["correct"] += (Y_hat.item() == Y)
+        self.data[Y]["correct"] += (int(Y_hat) == Y)
+        # self.data[Y]["correct"] += (Y_hat.item() == Y)
 
         return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y}
 
@@ -284,20 +352,18 @@ class ModelInterface(pl.LightningModule):
         target = torch.stack([x['label'] for x in val_step_outputs])
         
         self.log_dict(self.valid_metrics(logits, target),
-                          on_epoch = True, logger = True)
+                          on_epoch = True, logger = True, sync_dist=True)
         
         #---->
         # logits = logits.long()
         # target = target.squeeze().long()
         # logits = logits.squeeze(0)
         if len(target.unique()) != 1:
-            self.log('val_auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True)
+            self.log('val_auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         else:    
-            self.log('val_auc', 0.0, prog_bar=True, on_epoch=True, logger=True)
+            self.log('val_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
-        
-
-        self.log('val_loss', cross_entropy_torch(logits, target), prog_bar=True, on_epoch=True, logger=True)
+        self.log('val_loss', cross_entropy_torch(logits, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         
 
         precision, recall, thresholds = self.PRC(probs, target)
@@ -498,6 +564,8 @@ class ModelInterface(pl.LightningModule):
             print(f'{keys} = {values}')
             metrics[keys] = values.cpu().numpy()
         #---->acc log
+
+
         for c in range(self.n_classes):
             count = self.data[c]["count"]
             correct = self.data[c]["correct"]
@@ -530,7 +598,12 @@ class ModelInterface(pl.LightningModule):
     def configure_optimizers(self):
         # optimizer_ft = optim.Adam(self.model_ft.parameters(), lr=self.optimizer.lr*0.1)
         optimizer = create_optimizer(self.optimizer, self.model)
+        # optimizer = PESG(self.model, a=self.loss.a, b=self.loss.b, loss_fn=self.loss, lr=self.optimizer.lr, margin=1.0, epoch_decay=2e-3, weight_decay=1e-5, device=self.device)
+        # optimizer = PDSCA(self.model, loss_fn=self.loss, lr=self.optimizer.lr, margin=1.0, epoch_decay=2e-3, weight_decay=1e-5, device=self.device)
         return optimizer     
+
+    def optimizer_zero_grad(self, epoch, batch_idx, optimizer, optimizer_idx):
+        optimizer.zero_grad(set_to_none=True)
 
     def reshape_transform(self, tensor):
         # print(tensor.shape)
@@ -545,6 +618,7 @@ class ModelInterface(pl.LightningModule):
 
     def load_model(self):
         name = self.hparams.model.name
+        backbone = self.hparams.model.backbone
         # Change the `trans_unet.py` file name to `TransUnet` class name.
         # Please always name your model file name as `trans_unet.py` and
         # class name or funciton name corresponding `TransUnet`.
@@ -559,7 +633,25 @@ class ModelInterface(pl.LightningModule):
         except:
             raise ValueError('Invalid Module File Name or Invalid Class Name!')
         self.model = self.instancialize(Model)
+
+        # if backbone == 'retccl':
+
+        #     self.model_ft = ResNet.resnet50(num_classes=self.n_classes, mlp=False, two_branch=False, normlinear=True)
+        #     home = Path.cwd().parts[1]
+        #     # self.model_ft.fc = nn.Identity()
+        #     # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+        #     self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+        #     for param in self.model_ft.parameters():
+        #         param.requires_grad = False
+        #     self.model_ft.fc = nn.Linear(2048, self.out_features)
+        
+        # elif backbone == 'resnet50':
+        #     self.model_ft = resnet50_baseline(pretrained=True)
+        #     for param in self.model_ft.parameters():
+        #         param.requires_grad = False
+
         pass
+
 
     def instancialize(self, Model, **other_args):
         """ Instancialize a model using the corresponding parameters
@@ -573,6 +665,8 @@ class ModelInterface(pl.LightningModule):
             if arg in inkeys:
                 args1[arg] = getattr(self.hparams.model, arg)
         args1.update(other_args)
+
+
         return Model(**args1)
 
     def log_image(self, tensor, stage, name):
@@ -593,6 +687,8 @@ class ModelInterface(pl.LightningModule):
             self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
         else:
             fig_.savefig(f'{self.loggers[0].log_dir}/cm_test.png', dpi=400)
+
+        fig_.clf()
 
     def log_roc_curve(self, probs, target, stage):
 

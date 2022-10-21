@@ -16,7 +16,7 @@ General:
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um/'
+    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
     label_file: '/home/ylan/DeepGraft/training_tables/split_PAS_tcmr_viral.json'
     fold: 1
     nfold: 3
