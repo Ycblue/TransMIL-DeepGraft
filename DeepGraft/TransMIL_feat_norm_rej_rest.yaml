@@ -6,10 +6,10 @@ General:
     precision: 16 
     multi_gpu_mode: dp
     gpus: [0]
-    epochs: &epoch 500 
+    epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
-    patience: 50
+    patience: 100
     server: test #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
@@ -17,7 +17,7 @@ Data:
     dataset_name: custom
     data_shuffle: False
     data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_limit_100_split_PAS_HE_Jones_norm_rest_RA_RU.json'
+    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rej_rest.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -32,9 +32,9 @@ Data:
 
 Model:
     name: TransMIL
-    n_classes: 2
-    backbone: resnet50
-    in_features: 1024
+    n_classes: 3
+    backbone: features
+    in_features: 512
     out_features: 512
 
 

@@ -212,7 +212,7 @@ class JPGMILDataloader(data.Dataset):
         #     print(out_batch.shape)
         # out_batch = torch.permute(out_batch, (0, 2,1,3))
         label = torch.as_tensor(label)
-        label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
+        # label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
         # print(out_batch)
         return out_batch, label, (name, batch_names, patient) #, name_batch
 

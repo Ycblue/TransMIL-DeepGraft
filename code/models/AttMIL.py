@@ -13,7 +13,7 @@ from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 
 class AttMIL(nn.Module): #gated attention
-    def __init__(self, n_classes, features=512):
+    def __init__(self, n_classes, features=1024):
         super(AttMIL, self).__init__()
         self.L = features
         self.D = 128

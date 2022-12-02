@@ -3,21 +3,21 @@ General:
     seed: 2021
     fp16: True
     amp_level: O2
-    precision: 16 
+    precision: 32
     multi_gpu_mode: dp
     gpus: [0]
-    epochs: &epoch 500 
+    epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
-    patience: 50
-    server: test #train #test
+    patience: 100
+    server: train #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_limit_100_split_PAS_HE_Jones_norm_rest_RA_RU.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_128uM_annotated/'
+    label_file: '/home/ylan/DeepGraft/training_tables/dg_limit_100_split_PAS_HE_Jones_norm_rest.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -31,15 +31,15 @@ Data:
         num_workers: 4
 
 Model:
-    name: TransMIL
+    name: AttTrans
     n_classes: 2
     backbone: resnet50
-    in_features: 1024
-    out_features: 512
+    in_features: 512
+    out_features: 1024
 
 
 Optimizer:
-    opt: lookahead_radam
+    opt: Adam
     lr: 0.0002
     opt_eps: null 
     opt_betas: null

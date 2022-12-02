@@ -10,6 +10,7 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 import cv2
 from PIL import Image
+from pytorch_pretrained_vit import ViT
 
 #---->
 from MyOptimizer import create_optimizer
@@ -28,6 +29,13 @@ import torch.nn.functional as F
 import torchmetrics
 from torchmetrics.functional import stat_scores
 from torch import optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+from monai.config import KeysCollection
+from monai.data import Dataset, load_decathlon_datalist
+from monai.data.wsi_reader import WSIReader
+from monai.metrics import Cumulative, CumulativeAverage
+from monai.networks.nets import milmodel
 
 # from sklearn.metrics import roc_curve, auc, roc_curve_score
 
@@ -69,11 +77,19 @@ class ModelInterface(pl.LightningModule):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters()
         self.n_classes = model.n_classes
-        self.load_model()
-        self.loss = create_loss(loss, model.n_classes)
-        # self.loss = AUCM_MultiLabel(num_classes = model.n_classes, device=self.device)
+        
+        if model.name == 'AttTrans':
+            self.model = milmodel.MILModel(num_classes=self.n_classes, pretrained=True, mil_mode='att_trans', backbone_num_features=1024)
+        else: self.load_model()
+        # self.loss = create_loss(loss, model.n_classes)
+        # self.loss = 
+        if self.n_classes>2:
+            self.aucm_loss = AUCM_MultiLabel(num_classes = model.n_classes, device=self.device)
+        else:
+            self.aucm_loss = AUCMLoss()
         # self.asl = AsymmetricLossSingleLabel()
-        # self.loss = LabelSmoothingCrossEntropy(smoothing=0.1)
+        self.loss = LabelSmoothingCrossEntropy(smoothing=0.1)
+
         # self.loss = 
         # print(self.model)
         self.model_name = model.name
@@ -99,7 +115,7 @@ class ModelInterface(pl.LightningModule):
         # print(self.experiment)
         #---->Metrics
         if self.n_classes > 2: 
-            self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes)
+            self.AUROC = torchmetrics.AUROC(num_classes = self.n_classes, average='macro')
             
             metrics = torchmetrics.MetricCollection([torchmetrics.Accuracy(num_classes = self.n_classes,
                                                                            average='weighted'),
@@ -131,7 +147,9 @@ class ModelInterface(pl.LightningModule):
         # self.pr_curve = torchmetrics.BinnedPrecisionRecallCurve(num_classes = self.n_classes, thresholds=10)
         self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes = self.n_classes)                                                                    
         self.valid_metrics = metrics.clone(prefix = 'val_')
+        self.valid_patient_metrics = metrics.clone(prefix = 'val_patient_')
         self.test_metrics = metrics.clone(prefix = 'test_')
+        self.test_patient_metrics = metrics.clone(prefix = 'test_patient')
 
         #--->random
         self.shuffle = kargs['data'].data_shuffle
@@ -146,11 +164,15 @@ class ModelInterface(pl.LightningModule):
             self.feature_extractor = AutoFeatureExtractor.from_pretrained('facebook/dino-vitb16')
             self.model_ft = ViTModel.from_pretrained('facebook/dino-vitb16')
         elif self.backbone == 'resnet18':
-            self.model_ft = models.resnet18(pretrained=True)
+            self.model_ft = models.resnet18(weights='IMAGENET1K_V1')
             # modules = list(resnet18.children())[:-1]
+            # frozen_layers = 8
+            # for child in self.model_ft.children():
+
             for param in self.model_ft.parameters():
                 param.requires_grad = False
             self.model_ft.fc = nn.Linear(512, self.out_features)
+
 
             # res18 = nn.Sequential(
             #     *modules,
@@ -235,22 +257,28 @@ class ModelInterface(pl.LightningModule):
 
     def forward(self, x):
         # print(x.shape)
+        if self.model_name == 'AttTrans':
+            return self.model(x)
         if self.model_ft:
+            x = x.squeeze(0)
             feats = self.model_ft(x).unsqueeze(0)
         else: 
             feats = x.unsqueeze(0)
+        
         return self.model(feats)
         # return self.model(x)
 
     def step(self, input):
 
-        input = input.squeeze(0).float()
-        logits, _ = self(input.contiguous()) 
-
-        
-
+        input = input.float()
+        # logits, _ = self(input.contiguous()) 
+        logits = self(input.contiguous())
         Y_hat = torch.argmax(logits, dim=1)
-        Y_prob = F.softmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim = 1)
+
+
+        # Y_hat = torch.argmax(logits, dim=1)
+        # Y_prob = F.softmax(logits, dim=1)
 
         return logits, Y_prob, Y_hat
 
@@ -264,12 +292,19 @@ class ModelInterface(pl.LightningModule):
         # bag_idxs = torch.randperm(input.squeeze(0).shape[0])[:bag_size]
         # input = input.squeeze(0)[bag_idxs].unsqueeze(0)
 
-        label = label.float()
+        # label = label.float()
         
         logits, Y_prob, Y_hat = self.step(input) 
 
         #---->loss
         loss = self.loss(logits, label)
+
+        one_hot_label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
+        # aucm_loss = self.aucm_loss(torch.sigmoid(logits), one_hot_label)
+        # total_loss = torch.mean(loss + aucm_loss)
+        Y = int(label)
+        # print(logits, label)
+        # loss = cross_entropy_torch(logits.squeeze(0), label)
         # loss = self.asl(logits, label.squeeze())
 
         #---->acc log
@@ -278,11 +313,14 @@ class ModelInterface(pl.LightningModule):
         # if self.n_classes == 2:
         #     Y = int(label[0][1])
         # else: 
-        Y = torch.argmax(label)
+        # Y = torch.argmax(label)
+        
             # Y = int(label[0])
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (int(Y_hat) == Y)
-        self.log('loss', loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
+        # self.log('total_loss', total_loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
+        # self.log('aucm_loss', aucm_loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
+        self.log('lsce_loss', loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
 
         # if self.current_epoch % 10 == 0:
 
@@ -298,7 +336,7 @@ class ModelInterface(pl.LightningModule):
         #     self.loggers[0].experiment.add_image(f'{self.current_epoch}/input', grid)
 
 
-        return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': Y} 
+        return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': label} 
 
     def training_epoch_end(self, training_step_outputs):
         # logits = torch.cat([x['logits'] for x in training_step_outputs], dim = 0)
@@ -324,49 +362,64 @@ class ModelInterface(pl.LightningModule):
         if self.current_epoch % 10 == 0:
             self.log_confusion_matrix(max_probs, target, stage='train')
 
-        self.log('Train/auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        self.log('Train/auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
     def validation_step(self, batch, batch_idx):
 
-        input, label, _ = batch
-        label = label.float()
+        input, label, (wsi_name, batch_names, patient) = batch
+        # label = label.float()
         
         logits, Y_prob, Y_hat = self.step(input) 
 
         #---->acc log
         # Y = int(label[0][1])
-        Y = torch.argmax(label)
+        # Y = torch.argmax(label)
+        loss = self.loss(logits, label)
+        # loss = self.loss(logits, label)
+        # print(loss)
+        Y = int(label)
 
         # print(Y_hat)
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (int(Y_hat) == Y)
+        
         # self.data[Y]["correct"] += (Y_hat.item() == Y)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y}
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient, 'loss':loss}
 
 
     def validation_epoch_end(self, val_step_outputs):
+
+        # print(val_step_outputs)
+        # print(torch.cat([x['Y_prob'] for x in val_step_outputs], dim=0))
+        # print(torch.stack([x['Y_prob'] for x in val_step_outputs]))
+        
         logits = torch.cat([x['logits'] for x in val_step_outputs], dim = 0)
         probs = torch.cat([x['Y_prob'] for x in val_step_outputs])
         max_probs = torch.stack([x['Y_hat'] for x in val_step_outputs])
-        target = torch.stack([x['label'] for x in val_step_outputs])
+        target = torch.stack([x['label'] for x in val_step_outputs], dim=0).int()
+        slide_names = [x['name'] for x in val_step_outputs]
+        patients = [x['patient'] for x in val_step_outputs]
+
+        loss = torch.stack([x['loss'] for x in val_step_outputs])
+        # loss = torch.cat([x['loss'] for x in val_step_outputs])
+        # print(loss.shape)
         
-        self.log_dict(self.valid_metrics(logits, target),
+
+        # self.log('val_loss', cross_entropy_torch(logits.squeeze(), target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        self.log('val_loss', loss, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        
+        # print(logits)
+        # print(target)
+        self.log_dict(self.valid_metrics(max_probs.squeeze(), target.squeeze()),
                           on_epoch = True, logger = True, sync_dist=True)
         
-        #---->
-        # logits = logits.long()
-        # target = target.squeeze().long()
-        # logits = logits.squeeze(0)
+
         if len(target.unique()) != 1:
-            self.log('val_auc', self.AUROC(probs, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+            self.log('val_auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+            # self.log('val_patient_auc', self.AUROC(patient_score, patient_target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         else:    
             self.log('val_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
-
-        self.log('val_loss', cross_entropy_torch(logits, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
-        
-
-        precision, recall, thresholds = self.PRC(probs, target)
 
 
 
@@ -376,6 +429,62 @@ class ModelInterface(pl.LightningModule):
 
         #----> log confusion matrix
         self.log_confusion_matrix(max_probs, target, stage='val')
+
+        #----> log per patient metrics
+        complete_patient_dict = {}
+        patient_list = []            
+        patient_score = []      
+        patient_target = []
+
+        for p, s, pr, t in zip(patients, slide_names, probs, target):
+            if p not in complete_patient_dict.keys():
+                complete_patient_dict[p] = [(s, pr)]
+                patient_target.append(t)
+            else:
+                complete_patient_dict[p].append((s, pr))
+
+       
+
+        for p in complete_patient_dict.keys():
+            score = []
+            for (slide, probs) in complete_patient_dict[p]:
+                # max_probs = torch.argmax(probs)
+                # if self.n_classes == 2:
+                #     score.append(max_probs)
+                # else: score.append(probs)
+                score.append(probs)
+
+            # if self.n_classes == 2:
+                # score =
+            score = torch.mean(torch.stack(score), dim=0) #.cpu().detach().numpy()
+            # complete_patient_dict[p]['score'] = score
+            # print(p, score)
+            # patient_list.append(p)    
+            patient_score.append(score)    
+
+        patient_score = torch.stack(patient_score)
+        # print(patient_target)
+        # print(torch.cat(patient_target))
+        # print(self.AUROC(patient_score.squeeze(), torch.cat(patient_target)))
+
+        
+        patient_target = torch.cat(patient_target)
+
+        # print(patient_score.shape)
+        # print(patient_target.shape)
+        
+        if len(patient_target.unique()) != 1:
+            self.log('val_patient_auc', self.AUROC(patient_score.squeeze(), patient_target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        else:    
+            self.log('val_patient_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        
+        self.log_dict(self.valid_patient_metrics(patient_score, patient_target),
+                          on_epoch = True, logger = True, sync_dist=True)
+        
+            
+
+        # precision, recall, thresholds = self.PRC(probs, target)
+
         
 
         #---->acc log
@@ -394,178 +503,117 @@ class ModelInterface(pl.LightningModule):
             self.count = self.count+1
             random.seed(self.count*50)
 
+
+
     def test_step(self, batch, batch_idx):
 
-        torch.set_grad_enabled(True)
-        data, label, (wsi_name, batch_names) = batch
-        wsi_name = wsi_name[0]
+        input, label, (wsi_name, batch_names, patient) = batch
         label = label.float()
-        # logits, Y_prob, Y_hat = self.step(data) 
-        # print(data.shape)
-        data = data.squeeze(0).float()
-        logits, attn = self(data)
-        attn = attn.detach()
-        logits = logits.detach()
-
-        Y = torch.argmax(label)
-        Y_hat = torch.argmax(logits, dim=1)
-        Y_prob = F.softmax(logits, dim = 1)
         
-        #----> Get GradCam maps, map each instance to attention value, assemble, overlay on original WSI 
-        if self.model_name == 'TransMIL':
-           
-            target_layers = [self.model.layer2.norm] # 32x32
-            # target_layers = [self.model_ft[0].features[-1]] # 32x32
-            self.cam = GradCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform) #, reshape_transform=self.reshape_transform
-            # self.cam_ft = GradCAM(model=self.model, target_layers = target_layers_ft, use_cuda=True) #, reshape_transform=self.reshape_transform
-        else:
-            target_layers = [self.model.attention_weights]
-            self.cam = GradCAM(model = self.model, target_layers = target_layers, use_cuda=True)
-
-
-        data_ft = self.model_ft(data).unsqueeze(0).float()
-        instance_count = data.size(0)
-        target = [ClassifierOutputTarget(Y)]
-        grayscale_cam = self.cam(input_tensor=data_ft, targets=target)
-        grayscale_cam = torch.Tensor(grayscale_cam)[:instance_count, :]
-
-        # attention_map = grayscale_cam[:, :, 1].squeeze()
-        # attention_map = F.relu(attention_map)
-        # mask = torch.zeros((instance_count, 3, 256, 256)).to(self.device)
-        # for i, v in enumerate(attention_map):
-        #     mask[i, :, :, :] = v
-
-        # mask = self.assemble(mask, batch_names)
-        # mask = (mask - mask.min())/(mask.max()-mask.min())
-        # mask = mask.cpu().numpy()
-        # wsi = self.assemble(data, batch_names)
-        # wsi = wsi.cpu().numpy()
-
-        # def show_cam_on_image(img, mask):
-        #     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
-        #     heatmap = np.float32(heatmap) / 255
-        #     cam = heatmap*0.4 + np.float32(img)
-        #     cam = cam / np.max(cam)
-        #     return cam
-
-        # wsi = show_cam_on_image(wsi, mask)
-        # wsi = ((wsi-wsi.min())/(wsi.max()-wsi.min()) * 255.0).astype(np.uint8)
-        
-        # img = Image.fromarray(wsi)
-        # img = img.convert('RGB')
-        
-
-        # output_path = self.save_path / str(Y.item())
-        # output_path.mkdir(parents=True, exist_ok=True)
-        # img.save(f'{output_path}/{wsi_name}.jpg')
-
-
-        #----> Get Topk Tiles and Topk Patients
-        summed = torch.mean(grayscale_cam, dim=2)
-        topk_tiles, topk_indices = torch.topk(summed.squeeze(0), 5, dim=0)
-        topk_data = data[topk_indices].detach()
-        
-        # target_ft = 
-        # grayscale_cam_ft = self.cam_ft(input_tensor=data, )
-        # for i in range(data.shape[0]):
-            
-            # vis_img = data[i, :, :, :].cpu().numpy()
-            # vis_img = np.transpose(vis_img, (1,2,0))
-            # print(vis_img.shape)
-            # cam_img = grayscale_cam.squeeze(0)
-        # cam_img = self.reshape_transform(grayscale_cam)
-
-        # print(cam_img.shape)
-            
-            # visualization = show_cam_on_image(vis_img, cam_img, use_rgb=True)
-            # visualization = ((visualization/visualization.max())*255.0).astype(np.uint8)
-            # print(visualization)
-        # cv2.imwrite(f'{test_path}/{Y}/{name}/gradcam.jpg', cam_img)
+        logits, Y_prob, Y_hat = self.step(input) 
 
         #---->acc log
-        Y = torch.argmax(label)
-        self.data[Y]["count"] += 1
-        self.data[Y]["correct"] += (Y_hat.item() == Y)
+        Y = int(label)
+        # Y = torch.argmax(label)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y, 'name': wsi_name, 'topk_data': topk_data} #
-        # return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': name} #, 'topk_data': topk_data
+        # print(Y_hat)
+        self.data[Y]["count"] += 1
+        self.data[Y]["correct"] += (int(Y_hat) == Y)
+        # self.data[Y]["correct"] += (Y_hat.item() == Y)
+
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient}
 
     def test_epoch_end(self, output_results):
         logits = torch.cat([x['logits'] for x in output_results], dim = 0)
         probs = torch.cat([x['Y_prob'] for x in output_results])
         max_probs = torch.stack([x['Y_hat'] for x in output_results])
-        # target = torch.stack([x['label'] for x in output_results], dim = 0)
-        target = torch.stack([x['label'] for x in output_results])
-        # target = torch.argmax(target, dim=1)
-        patients = [x['name'] for x in output_results]
-        topk_tiles = [x['topk_data'] for x in output_results]
-        #---->
-        auc = self.AUROC(probs, target)
-        fpr, tpr, thresholds = self.ROC(probs, target)
-        fpr = fpr.cpu().numpy()
-        tpr = tpr.cpu().numpy()
-
-        plt.figure(1)
-        plt.plot(fpr, tpr)
-        plt.xlabel('False positive rate')
-        plt.ylabel('True positive rate')
-        plt.title('ROC curve')
-        plt.savefig(f'{self.save_path}/roc.jpg')
-        # self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
-
-        metrics = self.test_metrics(logits , target)
-
-
-        # metrics = self.test_metrics(max_probs.squeeze() , torch.argmax(target.squeeze(), dim=1))
-        metrics['test_auc'] = auc
-
-        # self.log('auc', auc, prog_bar=True, on_epoch=True, logger=True)
-
-        #---->get highest scoring patients for each class
-        # test_path = Path(self.save_path) / 'most_predictive' 
+        target = torch.stack([x['label'] for x in output_results]).int()
+        slide_names = [x['name'] for x in output_results]
+        patients = [x['patient'] for x in output_results]
         
-        # Path.mkdir(output_path, exist_ok=True)
-        topk, topk_indices = torch.topk(probs.squeeze(0), 5, dim=0)
-        for n in range(self.n_classes):
-            print('class: ', n)
-            
-            topk_patients = [patients[i[n]] for i in topk_indices]
-            topk_patient_tiles = [topk_tiles[i[n]] for i in topk_indices]
-            for x, p, t in zip(topk, topk_patients, topk_patient_tiles):
-                print(p, x[n])
-                patient = p
-                # outpath = test_path / str(n) / patient 
-                outpath = Path(self.save_path) / str(n) / patient
-                outpath.mkdir(parents=True, exist_ok=True)
-                for i in range(len(t)):
-                    tile = t[i]
-                    tile = tile.cpu().numpy().transpose(1,2,0)
-                    tile = (tile - tile.min())/ (tile.max() - tile.min()) * 255
-                    tile = tile.astype(np.uint8)
-                    img = Image.fromarray(tile)
+        self.log_dict(self.test_metrics(max_probs.squeeze(), target.squeeze()),
+                          on_epoch = True, logger = True, sync_dist=True)
+        self.log('test_loss', cross_entropy_torch(logits.squeeze(), target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+
+        if len(target.unique()) != 1:
+            self.log('test_auc', self.AUROC(probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+            # self.log('val_patient_auc', self.AUROC(patient_score, patient_target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        else:    
+            self.log('test_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+
+
+
+        #----> log confusion matrix
+        self.log_confusion_matrix(max_probs, target, stage='test')
+
+        #----> log per patient metrics
+        complete_patient_dict = {}
+        patient_list = []            
+        patient_score = []      
+        patient_target = []
+        patient_class_score = 0
+
+        for p, s, pr, t in zip(patients, slide_names, probs, target):
+            if p not in complete_patient_dict.keys():
+                complete_patient_dict[p] = [(s, pr)]
+                patient_target.append(t)
+            else:
+                complete_patient_dict[p].append((s, pr))
+
+       
+
+        for p in complete_patient_dict.keys():
+            score = []
+            for (slide, probs) in complete_patient_dict[p]:
+                # if self.n_classes == 2:
+                #     if probs.argmax().item() == 1: # only if binary and if class 1 is more important!!! Normal vs Diseased or Rejection vs Other
+                #         score.append(probs)
                     
-                    img.save(f'{outpath}/{i}.jpg')
+                # else: 
+                score.append(probs)
+            # print(score)
+            score = torch.stack(score)
+            # print(score)
+            if self.n_classes == 2:
+                positive_positions = (score.argmax(dim=1) == 1).nonzero().squeeze()
+                if positive_positions.numel() != 0:
+                    score = score[positive_positions]
+            else:
+            # score = torch.stack(torch.score)
+            ## get scores that predict class 1:
+            # positive_scores = score.argmax(dim=1)
+            # score = torch.sum(score.argmax(dim=1))
 
+            # if score.item() == 1:
+            #     patient_class_score = 1
+                score = torch.mean(score) #.cpu().detach().numpy()
+            # complete_patient_dict[p]['score'] = score
+            # print(p, score)
+            # patient_list.append(p)    
+            patient_score.append(score)    
+
+        print(patient_score)
+
+        patient_score = torch.stack(patient_score)
+        # patient_target = torch.stack(patient_target)
+        patient_target = torch.cat(patient_target)
+
+        
+        if len(patient_target.unique()) != 1:
+            self.log('test_patient_auc', self.AUROC(patient_score.squeeze(), patient_target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        else:    
+            self.log('test_patient_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        
+        self.log_dict(self.test_patient_metrics(patient_score, patient_target),
+                          on_epoch = True, logger = True, sync_dist=True)
+        
             
-            
-        #----->visualize top predictive tiles
-        
-        
+
+        # precision, recall, thresholds = self.PRC(probs, target)
 
         
-                # img = img.squeeze(0).cpu().numpy()
-                # img = np.transpose(img, (1,2,0))
-                # # print(img)
-                # # print(grayscale_cam.shape)
-                # visualization = show_cam_on_image(img, grayscale_cam, use_rgb=True)
 
-
-        for keys, values in metrics.items():
-            print(f'{keys} = {values}')
-            metrics[keys] = values.cpu().numpy()
         #---->acc log
-
-
         for c in range(self.n_classes):
             count = self.data[c]["count"]
             correct = self.data[c]["correct"]
@@ -573,37 +621,25 @@ class ModelInterface(pl.LightningModule):
                 acc = None
             else:
                 acc = float(correct) / count
-            print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
+            print('test class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
-
-        #---->plot auroc curve
-        # stats = stat_scores(probs, target, reduce='macro', num_classes=self.n_classes)
-        # fpr = {}
-        # tpr = {}
-        # for n in self.n_classes: 
-
-        # fpr, tpr, thresh = roc_curve(target.cpu().numpy(), probs.cpu().numpy())
-        #[tp, fp, tn, fn, tp+fn]
-
-
-        self.log_confusion_matrix(max_probs, target, stage='test')
-        #---->
-        result = pd.DataFrame([metrics])
-        result.to_csv(Path(self.save_path) / f'test_result.csv', mode='a', header=not Path(self.save_path).exists())
-
-        # with open(f'{self.save_path}/test_metrics.txt', 'a') as f:
-
-        #     f.write([metrics])
+        
+        #---->random, if shuffle data, change seed
+        if self.shuffle == True:
+            self.count = self.count+1
+            random.seed(self.count*50)
 
     def configure_optimizers(self):
         # optimizer_ft = optim.Adam(self.model_ft.parameters(), lr=self.optimizer.lr*0.1)
         optimizer = create_optimizer(self.optimizer, self.model)
-        # optimizer = PESG(self.model, a=self.loss.a, b=self.loss.b, loss_fn=self.loss, lr=self.optimizer.lr, margin=1.0, epoch_decay=2e-3, weight_decay=1e-5, device=self.device)
+        # optimizer = PESG(self.model, loss_fn=self.aucm_loss, lr=self.optimizer.lr, margin=1.0, epoch_decay=2e-3, weight_decay=1e-5, device=self.device)
         # optimizer = PDSCA(self.model, loss_fn=self.loss, lr=self.optimizer.lr, margin=1.0, epoch_decay=2e-3, weight_decay=1e-5, device=self.device)
-        return optimizer     
+        scheduler = {'scheduler': ReduceLROnPlateau(optimizer, mode='min', factor=0.5), 'monitor': 'val_loss', 'frequency': 5}
+        
+        return [optimizer], [scheduler]     
 
-    def optimizer_zero_grad(self, epoch, batch_idx, optimizer, optimizer_idx):
-        optimizer.zero_grad(set_to_none=True)
+    # def optimizer_zero_grad(self, epoch, batch_idx, optimizer, optimizer_idx):
+    #     optimizer.zero_grad(set_to_none=True)
 
     def reshape_transform(self, tensor):
         # print(tensor.shape)
@@ -618,10 +654,12 @@ class ModelInterface(pl.LightningModule):
 
     def load_model(self):
         name = self.hparams.model.name
-        backbone = self.hparams.model.backbone
         # Change the `trans_unet.py` file name to `TransUnet` class name.
         # Please always name your model file name as `trans_unet.py` and
         # class name or funciton name corresponding `TransUnet`.
+        if name == 'ViT':
+            self.model = ViT
+
         if '_' in name:
             camel_name = ''.join([i.capitalize() for i in name.split('_')])
         else:
@@ -686,7 +724,7 @@ class ModelInterface(pl.LightningModule):
         if stage == 'train':
             self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig_, self.current_epoch)
         else:
-            fig_.savefig(f'{self.loggers[0].log_dir}/cm_test.png', dpi=400)
+            fig_.savefig(f'{self.loggers[0].log_dir}/cm_{stage}.png', dpi=400)
 
         fig_.clf()
 

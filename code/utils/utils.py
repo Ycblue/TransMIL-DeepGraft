@@ -14,8 +14,10 @@ from pytorch_lightning import LightningModule
 from pytorch_lightning.loops.base import Loop
 from pytorch_lightning.loops.fit_loop import FitLoop
 from pytorch_lightning.trainer.states import TrainerFn
+from pytorch_lightning.callbacks import LearningRateMonitor
 from typing import Any, Dict, List, Optional, Type
 import shutil
+
 
 #---->read yaml
 import yaml
@@ -103,7 +105,7 @@ def load_callbacks(cfg, save_path):
         # save_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.resume_version}' / last.ckpt
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_loss',
                                          dirpath = str(output_path),
-                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc: .4f}',
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc: .4f}-{val_patient_auc}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 2,
@@ -111,7 +113,15 @@ def load_callbacks(cfg, save_path):
                                          save_weights_only = True))
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_auc',
                                          dirpath = str(output_path),
-                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}',
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc}',
+                                         verbose = True,
+                                         save_last = True,
+                                         save_top_k = 2,
+                                         mode = 'max',
+                                         save_weights_only = True))
+        Mycallbacks.append(ModelCheckpoint(monitor = 'val_patient_auc',
+                                         dirpath = str(output_path),
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 2,
@@ -121,6 +131,9 @@ def load_callbacks(cfg, save_path):
     swa = StochasticWeightAveraging(swa_lrs=1e-2)
     Mycallbacks.append(swa)
 
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+    Mycallbacks.append(lr_monitor)
+
     return Mycallbacks
 
 #---->val loss
@@ -128,7 +141,8 @@ import torch
 import torch.nn.functional as F
 def cross_entropy_torch(x, y):
     x_softmax = [F.softmax(x[i], dim=0) for i in range(len(x))]
-    x_log = torch.tensor([torch.log(x_softmax[i][y[i]]) for i in range(y.shape[0])])
+    x_log = torch.tensor([torch.log(x_softmax[i][y[i]]) for i in range(len(y))])
+    # x_log = torch.tensor([torch.log(x_softmax[i][y[i]]) for i in range(y.shape[0])])
     loss = - torch.sum(x_log) / y.shape[0]
     return loss
 

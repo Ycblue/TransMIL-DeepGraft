@@ -31,8 +31,7 @@ wd = 0.01
 
 ### Ablation
 
-image drop out: 
-tcmr_viral TCMR efficientnet: version 0
+# Important things: 
 
-wd incerease: 
-tcmr_viral TCMR efficientnet: version 110
+    * 
+

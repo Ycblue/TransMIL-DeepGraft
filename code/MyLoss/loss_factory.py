@@ -29,7 +29,7 @@ def create_loss(args, n_classes, w1=1.0, w2=0.5):
     loss = None
     print(conf_loss)
     if hasattr(nn, conf_loss): 
-        loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
+        loss = getattr(nn, conf_loss)()
         # loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
     #binary loss
     elif conf_loss == "focal":

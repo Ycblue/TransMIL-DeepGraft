@@ -395,3 +395,11 @@ def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
     kwargs['width_per_group'] = 64 * 2
     return _resnet('wide_resnet101_2', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
+
+if __name__ == '__main__':
+
+
+    model_ft = resnet50(num_classes=1024, mlp=False, two_branch=False, normlinear=True)
+
+    # model_ft.fc = nn.Identity()
+    print(model_ft)

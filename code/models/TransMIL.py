@@ -32,11 +32,12 @@ class TransLayer(nn.Module):
         )
 
     def forward(self, x):
-        out, attn = self.attn(self.norm(x), return_attn=True)
+        out= self.attn(self.norm(x))
+        # out, attn = self.attn(self.norm(x))
         x = x + out
         # x = x + self.attn(self.norm(x))
 
-        return x, attn
+        return x
 
 
 class PPEG(nn.Module):
@@ -59,16 +60,19 @@ class PPEG(nn.Module):
 class TransMIL(nn.Module):
     def __init__(self, n_classes):
         super(TransMIL, self).__init__()
-        in_features = 1024
+        in_features = 2048
+        inter_features = 1024
         out_features = 512
-        self.pos_layer = PPEG(dim=out_features)
-        self._fc1 = nn.Sequential(nn.Linear(in_features, out_features), nn.GELU())
-        # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         if apex_available: 
             norm_layer = apex.normalization.FusedLayerNorm
-            
         else:
             norm_layer = nn.LayerNorm
+
+        self.pos_layer = PPEG(dim=out_features)
+        self._fc1 = nn.Sequential(nn.Linear(in_features, inter_features), nn.GELU(), nn.Dropout(p=0.5), norm_layer(inter_features)) 
+        self._fc1_2 = nn.Sequential(nn.Linear(inter_features, out_features), nn.GELU())
+        # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
+        
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
         self.n_classes = n_classes
         self.layer1 = TransLayer(norm_layer=norm_layer, dim=out_features)
@@ -90,8 +94,10 @@ class TransMIL(nn.Module):
     def forward(self, x): #, **kwargs
 
         # x = self.model_ft(x).unsqueeze(0)
-        h = x.float() #[B, n, 1024]
+        h = x.squeeze(0).float() #[B, n, 1024]
         h = self._fc1(h) #[B, n, 512]
+        # h = self.drop(h)
+        h = self._fc1_2(h) #[B, n, 512]
         
         # print('Feature Representation: ', h.shape)
         #---->duplicate pad
@@ -110,7 +116,8 @@ class TransMIL(nn.Module):
 
 
         #---->Translayer x1
-        h, attn1 = self.layer1(h) #[B, N, 512]
+        h = self.layer1(h) #[B, N, 512]
+        # h, attn1 = self.layer1(h) #[B, N, 512]
 
         # print('After first TransLayer: ', h.shape)
 
@@ -119,7 +126,8 @@ class TransMIL(nn.Module):
         # print('After PPEG: ', h.shape)
         
         #---->Translayer x2
-        h, attn2 = self.layer2(h) #[B, N, 512]
+        h = self.layer2(h) #[B, N, 512]
+        # h, attn2 = self.layer2(h) #[B, N, 512]
 
         # print('After second TransLayer: ', h.shape) #[1, 1025, 512] 1025 = cls_token + 1024
         #---->cls_token
@@ -128,7 +136,11 @@ class TransMIL(nn.Module):
 
         #---->predict
         logits = self._fc2(h) #[B, n_classes]
-        return logits, attn2
+        # Y_hat = torch.argmax(logits, dim=1)
+        # Y_prob = F.softmax(logits, dim = 1)
+        # results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
+        return logits
+        # return logits, attn2
 
 if __name__ == "__main__":
     data = torch.randn((1, 6000, 1024)).cuda()

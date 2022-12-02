@@ -5,7 +5,8 @@ import glob
 
 from sklearn.model_selection import KFold
 
-from datasets.data_interface import DataInterface, MILDataModule, CrossVal_MILDataModule
+from datasets.data_interface import MILDataModule, CrossVal_MILDataModule
+# from datasets.data_interface import DataInterface, MILDataModule, CrossVal_MILDataModule
 from models.model_interface import ModelInterface
 from models.model_interface_dtfd import ModelInterface_DTFD
 import models.vision_transformer as vits
@@ -63,7 +64,9 @@ def make_parse():
     parser.add_argument('--stage', default='train', type=str)
     parser.add_argument('--config', default='DeepGraft/TransMIL.yaml',type=str)
     parser.add_argument('--version', default=2,type=int)
-    parser.add_argument('--gpus', nargs='+', default = [2], type=int)
+    parser.add_argument('--epoch', default='0',type=str)
+
+    parser.add_argument('--gpus', nargs='+', default = [0], type=int)
     parser.add_argument('--loss', default = 'CrossEntropyLoss', type=str)
     parser.add_argument('--fold', default = 0)
     parser.add_argument('--bag_size', default = 1024, type=int)
@@ -78,7 +81,7 @@ def make_parse():
 #---->main
 def main(cfg):
 
-    torch.set_num_threads(16)
+    torch.set_num_threads(8)
 
     #---->Initialize seed
     pl.seed_everything(cfg.General.seed)
@@ -111,6 +114,8 @@ def main(cfg):
                 'n_classes': cfg.Model.n_classes,
                 'bag_size': cfg.Data.bag_size,
                 'use_features': use_features,
+                'mixup': cfg.Data.mixup,
+                'aug': cfg.Data.aug,
                 }
 
     if cfg.Data.cross_val:
@@ -142,7 +147,7 @@ def main(cfg):
             logger=cfg.load_loggers,
             callbacks=cfg.callbacks,
             max_epochs= cfg.General.epochs,
-            min_epochs = 100,
+            min_epochs = 500,
             accelerator='gpu',
             # plugins=plugins,
             devices=cfg.General.gpus,
@@ -156,7 +161,7 @@ def main(cfg):
             # limit_train_batches=1,
             
             # deterministic=True,
-            check_val_every_n_epoch=5,
+            check_val_every_n_epoch=1,
         )
     else:
         trainer = Trainer(
@@ -167,7 +172,7 @@ def main(cfg):
             min_epochs = 100,
 
             # gpus=cfg.General.gpus,
-            accelerator='gpu'
+            accelerator='gpu',
             devices=cfg.General.gpus,
             amp_backend='native',
             # amp_level=cfg.General.amp_level,  
@@ -178,7 +183,7 @@ def main(cfg):
             # limit_train_batches=1,
             
             # deterministic=True,
-            check_val_every_n_epoch=5,
+            check_val_every_n_epoch=1,
         )
     # print(cfg.log_path)
     # print(trainer.loggers[0].log_dir)
@@ -215,18 +220,29 @@ def main(cfg):
         else:
             trainer.fit(model = model, datamodule = dm)
     else:
-        log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' 
+        log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}'/'checkpoints' 
 
+        print(log_path)
         test_path = Path(log_path) / 'test'
-        for n in range(cfg.Model.n_classes):
-            n_output_path = test_path / str(n)
-            n_output_path.mkdir(parents=True, exist_ok=True)
+        # for n in range(cfg.Model.n_classes):
+        #     n_output_path = test_path / str(n)
+        #     n_output_path.mkdir(parents=True, exist_ok=True)
         # print(cfg.log_path)
         model_paths = list(log_path.glob('*.ckpt'))
-        model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
+        # print(model_paths)
+        # print(cfg.epoch)
+        # model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
+        if cfg.epoch == 'last':
+            model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
+        elif int(cfg.epoch) < 10:
+            cfg.epoch = f'0{cfg.epoch}'
+        
+        else:
+            model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
         # model_paths = [f'{log_path}/epoch=279-val_loss=0.4009.ckpt']
+
         for path in model_paths:
-            print(path)
+            # print(path)
             new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
             trainer.test(model=new_model, datamodule=dm)
 
@@ -257,6 +273,7 @@ def check_home(cfg):
 if __name__ == '__main__':
 
     args = make_parse()
+
     cfg = read_yaml(args.config)
 
     #---->update
@@ -283,7 +300,10 @@ if __name__ == '__main__':
     cfg.task = task
     # task = Path(cfg.config).name[:-5].split('_')[2:][0]
     cfg.log_path = log_path / f'{cfg.Model.name}' / task / log_name 
-    
+
+
+
+    cfg.epoch = args.epoch
     
 
     # ---->main

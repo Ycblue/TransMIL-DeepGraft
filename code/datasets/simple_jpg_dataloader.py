@@ -20,8 +20,8 @@ from imgaug import augmenters as iaa
 from torchsampler import ImbalancedDatasetSampler
 
 
-class FeatureBagLoader(data_utils.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, load_data=False, data_cache_size=100, max_bag_size=1000):
+class JPGBagLoader(data_utils.Dataset):
+    def __init__(self, file_path, label_path, mode, n_classes, load_data=False, data_cache_size=100, max_bag_size=1000, cache=False):
         super().__init__()
 
         self.data_info = []
@@ -35,7 +35,7 @@ class FeatureBagLoader(data_utils.Dataset):
         self.label_path = label_path
         self.n_classes = n_classes
         self.max_bag_size = max_bag_size
-        self.min_bag_size = 120
+        self.min_bag_size = 50
         self.empty_slides = []
         self.corrupt_slides = []
         self.cache = True
@@ -222,7 +222,7 @@ class FeatureBagLoader(data_utils.Dataset):
         if self.cache:
             label = self.labels[index]
             wsi = self.features[index]
-            label = Variable(Tensor(label))
+            label = int(label)
             wsi_name = self.wsi_names[index]
             name_batch = self.name_batches[index]
             patient = self.patients[index]
@@ -231,13 +231,14 @@ class FeatureBagLoader(data_utils.Dataset):
         else:
             if self.mode=='train':
                 batch, label, (wsi_name, name_batch, patient) = self.get_data(self.files[index])
-                label = Variable(Tensor(label))
+                # label = Variable(Tensor(label))
+
                 # wsi = Variable(Tensor(wsi_batch))
                 out_batch = []
                 seq_img_d = self.train_transforms.to_deterministic()
                 for img in batch: 
                     img = img.numpy().astype(np.uint8)
-                    img = seq_img_d.augment_image(img)
+                    # img = seq_img_d.augment_image(img)
                     img = self.val_transforms(img.copy())
                     out_batch.append(img)
                 out_batch = torch.stack(out_batch)
@@ -278,7 +279,7 @@ if __name__ == '__main__':
 
     n_classes = 2
 
-    dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', load_data=False, n_classes=n_classes)
+    dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', load_data=False, n_classes=n_classes)
 
     # print(dataset.get_labels(0))
     a = int(len(dataset)* 0.8)
@@ -311,7 +312,7 @@ if __name__ == '__main__':
         bag, label, (name, batch_names, patient) = item
         # print(bag.shape)
         # print(len(batch_names))
-        
+        print(label)
         bag = bag.squeeze(0).float().to(device)
         label = label.to(device)
         with torch.cuda.amp.autocast():

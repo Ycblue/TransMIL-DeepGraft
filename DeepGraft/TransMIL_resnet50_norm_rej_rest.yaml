@@ -6,11 +6,11 @@ General:
     precision: 16 
     multi_gpu_mode: dp
     gpus: [0]
-    epochs: &epoch 500 
+    epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
-    patience: 50
-    server: test #train #test
+    patience: 100
+    server: train #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
