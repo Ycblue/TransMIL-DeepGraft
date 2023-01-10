@@ -51,26 +51,63 @@ class custom_test_module(ModelInterface):
     # self.task = kargs['task']    
     # self.task = 'tcmr_viral'
 
+    # def forward(self, x):
+    #     batch_size = x.shape[0]
+    #     bag_size = x.shape[1]
+    #     x = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
+    #     feats = self.model_ft(x).unsqueeze(0)
+    #     feats = feats.view(batch_size, bag_size, -1)
+    #     return self.model(feats)
+
+
+
+
     def test_step(self, batch, batch_idx):
+
+        print('custom: ', self.backbone)
+        print(self.model_ft.device)
+        
 
         torch.set_grad_enabled(True)
 
-        input_data, label, (wsi_name, batch_names, patient) = batch
-        patient = patient[0]
-        wsi_name = wsi_name[0]
-        label = label.float()
-        # logits, Y_prob, Y_hat = self.step(data) 
-        # print(data.shape)
-        input_data = input_data.squeeze(0).float()
-        # print(self.model_ft)
-        # print(self.model)
-        logits, _ = self(input_data)
-        # attn = attn.detach()
-        # logits = logits.detach()
+        input, label, (wsi_name, patient) = batch
+        
+        print(input.device)
+        # input, label, (wsi_name, batch_names, patient) = batch
+        # label = label.float()
+        # 
+        # feature extraction
+        x = input
+        batch_size = x.shape[0]
+        bag_size = x.shape[1]
+        # new_shape = (batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
+        # x = x.view(new_shape)
+        x = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
+        data_ft = self.model_ft(x).unsqueeze(0)
+        data_ft = data_ft.view(batch_size, bag_size, -1)
 
-        Y = torch.argmax(label)
+        logits = self.model(data_ft) 
         Y_hat = torch.argmax(logits, dim=1)
-        Y_prob = F.softmax(logits, dim=1)
+        Y_prob = F.softmax(logits, dim = 1)
+        # logits, Y_prob, Y_hat = self.model(data_ft) 
+        loss = self.loss(logits, label)
+
+        # input_data, label, (wsi_name, batch_names, patient) = batch
+        # patient = patient[0]
+        # wsi_name = wsi_name[0]
+        # label = label.float()
+        # # logits, Y_prob, Y_hat = self.step(data) 
+        # # print(data.shape)
+        # input_data = input_data.squeeze(0).float()
+        # # print(self.model_ft)
+        # # print(self.model)
+        # logits, _ = self(input_data)
+        # # attn = attn.detach()
+        # # logits = logits.detach()
+
+        # Y = torch.argmax(label)
+        # Y_hat = torch.argmax(logits, dim=1)
+        # Y_prob = F.softmax(logits, dim=1)
 
         
 
@@ -92,13 +129,13 @@ class custom_test_module(ModelInterface):
             target_layers = [self.model.attention_weights]
             self.cam = GradCAM(model = self.model, target_layers = target_layers, use_cuda=True)
 
-        if self.model_ft:
-            data_ft = self.model_ft(input_data).unsqueeze(0).float()
-        else:
-            data_ft = input_data.unsqueeze(0).float()
-        instance_count = input_data.size(0)
+        # if self.model_ft:
+        #     data_ft = self.model_ft(input_data).unsqueeze(0).float()
+        # else:
+        #     data_ft = input_data.unsqueeze(0).float()
+        instance_count = input.size(0)
         # data_ft.requires_grad=True
-        
+        Y = torch.argmax(label)
         target = [ClassifierOutputTarget(Y)]
         # print(target)
         
@@ -111,13 +148,13 @@ class custom_test_module(ModelInterface):
         k = 10
         summed = torch.mean(grayscale_cam, dim=2)
         topk_tiles, topk_indices = torch.topk(summed.squeeze(0), k, dim=0)
-        topk_data = input_data[topk_indices].detach()
+        topk_data = input[topk_indices].detach()
         # print(topk_tiles)
         
         #----------------------------------------------------
         # Log Correct/Count
         #----------------------------------------------------
-        Y = torch.argmax(label)
+        # Y = torch.argmax(label)
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (Y_hat.item() == Y)
 
@@ -143,58 +180,84 @@ class custom_test_module(ModelInterface):
 
         logits = torch.cat([x['logits'] for x in output_results], dim = 0)
         probs = torch.cat([x['Y_prob'] for x in output_results])
-        max_probs = torch.stack([x['Y_hat'] for x in output_results])
-        # target = torch.stack([x['label'] for x in output_results], dim = 0)
-        target = torch.stack([x['label'] for x in output_results])
-        # target = torch.argmax(target, dim=1)
-        slide = [x['name'] for x in output_results]
+        # max_probs = torch.stack([x['Y_hat'] for x in output_results])
+        max_probs = torch.cat([x['Y_hat'] for x in output_results])
+        target = torch.cat([x['label'] for x in output_results])
+        slide_names = [x['name'] for x in output_results]
         patients = [x['patient'] for x in output_results]
-        topk_tiles = [x['topk_data'] for x in output_results]
+        loss = torch.stack([x['loss'] for x in output_results])
         #---->
 
-        if len(target.unique()) !=1:
-            auc = self.AUROC(probs, target)
-        else: auc = torch.tensor(0)
-        metrics = self.test_metrics(logits , target)
+        self.log_dict(self.test_metrics(max_probs.squeeze(), target.squeeze()),
+                          on_epoch = True, logger = True, sync_dist=True)
+        self.log('test_loss', loss.mean(), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+
+        if self.n_classes <=2:
+            out_probs = probs[:,1] 
+        else: out_probs = probs
+            # max_probs = max_probs[:,1]
+
+        if len(target.unique()) != 1:
+                self.log('test_auc', self.AUROC(out_probs, target.squeeze()), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+            # self.log('val_patient_auc', self.AUROC(patient_score, patient_target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
+        else:    
+            self.log('test_auc', 0.0, prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
 
-        # metrics = self.test_metrics(max_probs.squeeze() , torch.argmax(target.squeeze(), dim=1))
-        metrics['test_auc'] = auc
 
-        # print(metrics)
-        np_metrics = {k: metrics[k].item() for k in metrics.keys()}
-        # print(np_metrics)
+        #----> log confusion matrix
+        self.log_confusion_matrix(max_probs, target, stage='test')
 
-        
+        #----> log per patient metrics
         complete_patient_dict = {}
-        '''
-        Patient
-        -> slides:
-            -> SlideName:
-                ->probs = [0.5, 0.5] 
-                ->topk = [10,3,224,224]
-        -> score = []
-        '''
-
-
-        for p, s, l, topkt in zip(patients, slide, probs, topk_tiles):
-            if p not in complete_patient_dict.keys():
-                complete_patient_dict[p] = {'slides':{}}
-            complete_patient_dict[p]['slides'][s] = {'probs': l, 'topk':topkt}
-
         patient_list = []            
-        patient_score = []            
-        for p in complete_patient_dict.keys():
-            score = []
-            
-            for s in complete_patient_dict[p]['slides'].keys():
-                score.append(complete_patient_dict[p]['slides'][s]['probs'])
-            score = torch.mean(torch.stack(score), dim=0) #.cpu().detach().numpy()
-            complete_patient_dict[p]['score'] = score
-            # print(p, score)
-            patient_list.append(p)    
-            patient_score.append(score)    
+        patient_score = []      
+        patient_target = []
+        patient_class_score = 0
 
+
+        for p, s, pr, t in zip(patients, slide_names, probs, target):
+            p = p[0]
+            # print(s[0])
+            # print(pr)
+            if p not in complete_patient_dict.keys():
+                complete_patient_dict[p] = {'scores':[(s[0], pr)], 'patient_score': 0}
+                # print((s,pr))
+                # complete_patient_dict[p]['scores'] = []
+                # print(t)
+                patient_target.append(t)
+            else:
+                complete_patient_dict[p]['scores'].append((s[0], pr))
+
+        for p in complete_patient_dict.keys():
+            # complete_patient_dict[p] = 0
+            score = []
+            for (slide, probs) in complete_patient_dict[p]['scores']:
+                score.append(probs)
+            # print(score)
+            score = torch.stack(score)
+            # print(score)
+            if self.n_classes == 2:
+                positive_positions = (score.argmax(dim=1) == 1).nonzero().squeeze()
+                # print(positive_positions)
+                if positive_positions.numel() != 0:
+                    score = score[positive_positions]
+            if len(score.shape) > 1:
+                score = torch.mean(score, dim=0) #.cpu().detach().numpy()
+
+            patient_score.append(score)  
+            complete_patient_dict[p]['patient_score'] = score
+        correct_patients = []
+        false_patients = []
+
+        for patient, label in zip(complete_patient_dict.keys(), patient_target):
+            if label == 0:
+                p_score =  complete_patient_dict[patient]['patient_score']
+                # print(torch.argmax(patient_score))
+                if torch.argmax(p_score) == label:
+                    correct_patients.append(patient)
+                else: 
+                    false_patients.append(patient)
         # print(patient_list)
         #topk patients: 
 
@@ -231,7 +294,6 @@ class custom_test_module(ModelInterface):
 
             patient_top_slides = {} 
             for p in topk_patients:
-                # print(p)
                 output_dict[class_name][p] = {}
                 output_dict[class_name][p]['Patient_Score'] = complete_patient_dict[p]['score'].cpu().detach().numpy().tolist()
 
@@ -303,7 +365,7 @@ class custom_test_module(ModelInterface):
         #     return coords
 
         home = Path.cwd().parts[1]
-        jpg_dir = f'/{home}/ylan/data/DeepGraft/224_128um_annotated/Aachen_Biopsy_Slides/BLOCKS'
+        jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides/BLOCKS'
 
         coords = batch_names.squeeze()
         data = []
@@ -477,23 +539,37 @@ def main(cfg):
     # cfg.Data.label_file = '/home/ylan/DeepGraft/training_tables/dg_limit_20_split_PAS_HE_Jones_norm_rest.json'
     # cfg.Data.patient_slide = '/homeStor1/ylan/DeepGraft/training_tables/cohort_stain_dict.json'
     # cfg.Data.data_dir = '/homeStor1/ylan/data/DeepGraft/224_128um_v2/'
+    train_classic = False
+    if cfg.Model.name in ['inception', 'resnet18', 'resnet50', 'vit']:
+        train_classic = True
+        use_features = False
     if cfg.Model.backbone == 'features':
-        use_features = True
-    else: use_features = False
+        use_features = False
+        cfg.Model.backbone = 'retccl'
+    else: 
+        use_features = False
+
+    print(cfg.Model.backbone)
+    # use_features = False
+
     DataInterface_dict = {
                 'data_root': cfg.Data.data_dir,
                 'label_path': cfg.Data.label_file,
                 'batch_size': cfg.Data.train_dataloader.batch_size,
                 'num_workers': cfg.Data.train_dataloader.num_workers,
                 'n_classes': cfg.Model.n_classes,
-                'backbone': cfg.Model.backbone,
                 'bag_size': cfg.Data.bag_size,
                 'use_features': use_features,
+                'mixup': cfg.Data.mixup,
+                'aug': cfg.Data.aug,
+                'cache': cfg.Data.cache,
+                'train_classic': train_classic,
+                'model_name': cfg.Model.name,
                 }
 
     dm = MILDataModule(**DataInterface_dict)
     
-
+    # print(cfg.Model.backbone)
     #---->Define Model
     ModelInterface_dict = {'model': cfg.Model,
                             'loss': cfg.Loss,
@@ -503,6 +579,7 @@ def main(cfg):
                             'backbone': cfg.Model.backbone,
                             'task': cfg.task,
                             }
+    # print(ModelInterface_dict)
     # model = ModelInterface(**ModelInterface_dict)
     model = custom_test_module(**ModelInterface_dict)
     # model._fc1 = nn.Sequential(nn.Linear(512, 512), nn.GELU())
@@ -551,8 +628,8 @@ def main(cfg):
     for path in model_paths:
         # with open(f'{log_path}/test_metrics.txt', 'w') as f:
         #     f.write(str(path) + '\n')
-        print(path)
         new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        new_model.init_backbone()
         new_model.save_path = Path(cfg.log_path) / 'visualization'
         trainer.test(model=new_model, datamodule=dm)
     
@@ -616,10 +693,12 @@ if __name__ == '__main__':
     from models import TransMIL
     from datasets.zarr_feature_dataloader_simple import ZarrFeatureBagLoader
     from datasets.feature_dataloader import FeatureBagLoader
+    from datasets.jpg_dataloader import JPGMILDataloader
     from torch.utils.data import random_split, DataLoader
     import time
     from tqdm import tqdm
     import torchmetrics
+    import models.ResNet as ResNet
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(device)
@@ -642,7 +721,19 @@ if __name__ == '__main__':
     n_classes = hyper_parameters['model']['n_classes']
 
     # model = TransMIL()
-    model = TransMIL(n_classes).to(device)
+
+    model_ft = ResNet.resnet50(num_classes=128, mlp=False, two_branch=False, normlinear=True)
+    home = Path.cwd().parts[1]
+    # pre_model = 
+    # self.model_ft.fc = nn.Identity()
+    # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+    model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+    for param in model_ft.parameters():
+        param.requires_grad = False
+    model_ft.fc = torch.nn.Identity()
+    model_ft.to(device)
+
+    model = TransMIL(n_classes=n_classes, in_features=2048).to(device)
     model_weights = checkpoint['state_dict']
 
     for key in list(model_weights):
@@ -667,9 +758,9 @@ if __name__ == '__main__':
     model.eval()
 
     home = Path.cwd().parts[1]
-    data_root = f'/{home}/ylan/data/DeepGraft/224_128uM_annotated'
+    data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
     label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
-    dataset = FeatureBagLoader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes)
+    dataset = JPGMILDataloader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes, model_name = 'TransMIL')
 
     dl = DataLoader(dataset, batch_size=1, num_workers=8)
 
@@ -693,7 +784,15 @@ if __name__ == '__main__':
         # print(bag.shape)
         bag = bag.unsqueeze(0)
         with torch.cuda.amp.autocast():
-            logits = model(bag)
+            batch_size = bag.shape[0]
+            bag_size = bag.shape[1]
+            bag = bag.view(batch_size*bag_size, bag.shape[2], bag.shape[3], bag.shape[4])
+            feats = self.model_ft(bag).unsqueeze(0)
+            # print(feats.shape)
+            # print(x.shape)
+            # if feats.dim() == 3:
+            feats = feats.view(batch_size, bag_size, -1)
+            logits = model(feats)
         Y_hat = torch.argmax(logits, dim=1)
         Y_prob = F.softmax(logits, dim = 1)
 

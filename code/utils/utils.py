@@ -39,7 +39,7 @@ def load_loggers(cfg):
     
     
     #---->TensorBoard
-    if cfg.stage != 'test':
+    if cfg.General.server != 'test':
         
         tb_logger = pl_loggers.TensorBoardLogger(cfg.log_path,
                                                   # version = f'fold{cfg.Data.fold}'
@@ -51,13 +51,16 @@ def load_loggers(cfg):
                                         ) # version = f'fold{cfg.Data.fold}', 
         # print(csv_logger.version)
     else:  
-        cfg.log_path = Path(cfg.log_path) / f'test'
+        cfg.log_path = Path(cfg.log_path)
+        print('cfg.log_path: ', cfg.log_path)
+
         tb_logger = pl_loggers.TensorBoardLogger(cfg.log_path,
-                                                version = f'test',
+                                                version = cfg.version,
+                                                sub_dir = f'test_e{cfg.epoch}',
                                                 log_graph = True, default_hp_metric = False)
         #---->CSV
         csv_logger = pl_loggers.CSVLogger(cfg.log_path,
-                                        version = f'test', )
+                                        version = cfg.version, )
                               
     
     print(f'---->Log dir: {cfg.log_path}')
@@ -79,11 +82,11 @@ def load_callbacks(cfg, save_path):
     output_path.mkdir(exist_ok=True, parents=True)
 
     early_stop_callback = EarlyStopping(
-        monitor='val_auc',
+        monitor='val_loss',
         min_delta=0.00,
         patience=cfg.General.patience,
         verbose=True,
-        mode='max'
+        mode='min'
     )
 
     Mycallbacks.append(early_stop_callback)
@@ -105,7 +108,7 @@ def load_callbacks(cfg, save_path):
         # save_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.resume_version}' / last.ckpt
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_loss',
                                          dirpath = str(output_path),
-                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc: .4f}-{val_patient_auc}',
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc: .4f}-{val_patient_auc:.4f}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 2,
@@ -113,7 +116,7 @@ def load_callbacks(cfg, save_path):
                                          save_weights_only = True))
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_auc',
                                          dirpath = str(output_path),
-                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc}',
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc: .4f}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 2,
@@ -121,7 +124,7 @@ def load_callbacks(cfg, save_path):
                                          save_weights_only = True))
         Mycallbacks.append(ModelCheckpoint(monitor = 'val_patient_auc',
                                          dirpath = str(output_path),
-                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc}',
+                                         filename = '{epoch:02d}-{val_loss:.4f}-{val_auc:.4f}-{val_patient_auc:.4f}',
                                          verbose = True,
                                          save_last = True,
                                          save_top_k = 2,

@@ -3,44 +3,47 @@ General:
     seed: 2021
     fp16: True
     amp_level: O2
-    precision: 16 
-    multi_gpu_mode: dp
-    gpus: [0]
-    epochs: &epoch 500 
+    precision: 16
+    multi_gpu_mode: ddp
+    gpus: [0, 1]
+    epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
     patience: 50
-    server: test #train #test
+    server: train #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_rej_rest.json'
+    mixup: True
+    aug: True
+    cache: False
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_rej_rest_val_1.json'
     fold: 1
     nfold: 3
     cross_val: False
 
     train_dataloader:
-        batch_size: 1 
-        num_workers: 8
+        batch_size: 100
+        num_workers: 4
 
     test_dataloader:
         batch_size: 1
-        num_workers: 8
+        num_workers: 4
 
 Model:
     name: TransMIL
     n_classes: 2
     backbone: features
-    in_features: 1024
+    in_features: 2048
     out_features: 512
 
 
 Optimizer:
     opt: lookahead_radam
-    lr: 0.0002
+    lr: 0.002
     opt_eps: null 
     opt_betas: null
     momentum: null 

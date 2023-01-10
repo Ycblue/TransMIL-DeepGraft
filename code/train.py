@@ -8,6 +8,7 @@ from sklearn.model_selection import KFold
 from datasets.data_interface import MILDataModule, CrossVal_MILDataModule
 # from datasets.data_interface import DataInterface, MILDataModule, CrossVal_MILDataModule
 from models.model_interface import ModelInterface
+from models.model_interface_classic import ModelInterface_Classic
 from models.model_interface_dtfd import ModelInterface_DTFD
 import models.vision_transformer as vits
 from utils.utils import *
@@ -70,9 +71,9 @@ def make_parse():
     parser.add_argument('--loss', default = 'CrossEntropyLoss', type=str)
     parser.add_argument('--fold', default = 0)
     parser.add_argument('--bag_size', default = 1024, type=int)
+    # parser.add_argument('--batch_size', default = 1, type=int)
     parser.add_argument('--resume_training', action='store_true')
     parser.add_argument('--label_file', type=str)
-    # parser.add_argument('--ckpt_path', default = , type=str)
     
 
     args = parser.parse_args()
@@ -103,6 +104,13 @@ def main(cfg):
     #             'dataset_cfg': cfg.Data,}
     # dm = DataInterface(**DataInterface_dict)
     home = Path.cwd().parts[1]
+
+    train_classic = False
+    if cfg.Model.name in ['inception', 'resnet18', 'resnet50', 'vit']:
+        train_classic = True
+        use_features = False
+
+
     if cfg.Model.backbone == 'features':
         use_features = True
     else: use_features = False
@@ -116,6 +124,9 @@ def main(cfg):
                 'use_features': use_features,
                 'mixup': cfg.Data.mixup,
                 'aug': cfg.Data.aug,
+                'cache': cfg.Data.cache,
+                'train_classic': train_classic,
+                'model_name': cfg.Model.name,
                 }
 
     if cfg.Data.cross_val:
@@ -124,6 +135,7 @@ def main(cfg):
     
 
     #---->Define Model
+    
     ModelInterface_dict = {'model': cfg.Model,
                             'loss': cfg.Loss,
                             'optimizer': cfg.Optimizer,
@@ -131,9 +143,14 @@ def main(cfg):
                             'log': cfg.log_path,
                             'backbone': cfg.Model.backbone,
                             'task': cfg.task,
+                            'in_features': cfg.Model.in_features,
+                            'out_features': cfg.Model.out_features,
                             }
-    if cfg.Model.name == 'DTFDMIL':
-        model = ModelInterface_DTFD(**ModelInterface_dict)
+
+    if train_classic:
+        model = ModelInterface_Classic(**ModelInterface_dict)
+    # elif cfg.Model.name == 'DTFDMIL':
+    #     model = ModelInterface_DTFD(**ModelInterface_dict)
     else:
         model = ModelInterface(**ModelInterface_dict)
     
@@ -169,7 +186,7 @@ def main(cfg):
             logger=cfg.load_loggers,
             callbacks=cfg.callbacks,
             max_epochs= cfg.General.epochs,
-            min_epochs = 100,
+            min_epochs = 150,
 
             # gpus=cfg.General.gpus,
             accelerator='gpu',
@@ -179,10 +196,12 @@ def main(cfg):
             precision=cfg.General.precision,  
             accumulate_grad_batches=cfg.General.grad_acc,
             gradient_clip_val=0.0,
+            log_every_n_steps=10,
             # fast_dev_run = True,
             # limit_train_batches=1,
             
             # deterministic=True,
+            # num_sanity_val_steps=0,
             check_val_every_n_epoch=1,
         )
     # print(cfg.log_path)
@@ -192,21 +211,16 @@ def main(cfg):
 
     # home = Path.cwd()[0]
 
-    copy_path = Path(trainer.loggers[0].log_dir) / 'code'
-    copy_path.mkdir(parents=True, exist_ok=True)
-    copy_origin = '/' / Path('/'.join(cfg.log_path.parts[1:5])) / 'code'
-    # print(copy_path)
-    # print(copy_origin)
-    shutil.copytree(copy_origin, copy_path, dirs_exist_ok=True)
+    if cfg.General.server == 'train':
 
-    
-    # print(trainer.loggers[0].log_dir)
+        copy_path = Path(trainer.loggers[0].log_dir) / 'code'
+        copy_path.mkdir(parents=True, exist_ok=True)
+        copy_origin = '/' / Path('/'.join(cfg.log_path.parts[1:5])) / 'code'
+        shutil.copytree(copy_origin, copy_path, dirs_exist_ok=True)
 
     #---->train or test
     if cfg.resume_training:
         last_ckpt = log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'last.ckpt'
-        # model = model.load_from_checkpoint(last_ckpt)
-        # trainer.fit(model, dm) #, datamodule = dm
         trainer.fit(model = model, ckpt_path=last_ckpt) #, datamodule = dm
 
     if cfg.General.server == 'train':
@@ -222,16 +236,9 @@ def main(cfg):
     else:
         log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}'/'checkpoints' 
 
-        print(log_path)
-        test_path = Path(log_path) / 'test'
-        # for n in range(cfg.Model.n_classes):
-        #     n_output_path = test_path / str(n)
-        #     n_output_path.mkdir(parents=True, exist_ok=True)
-        # print(cfg.log_path)
         model_paths = list(log_path.glob('*.ckpt'))
-        # print(model_paths)
-        # print(cfg.epoch)
-        # model_paths = [str(model_path) for model_path in model_paths if 'epoch' in str(model_path)]
+
+
         if cfg.epoch == 'last':
             model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
         elif int(cfg.epoch) < 10:
@@ -242,9 +249,9 @@ def main(cfg):
         # model_paths = [f'{log_path}/epoch=279-val_loss=0.4009.ckpt']
 
         for path in model_paths:
-            # print(path)
-            new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
-            trainer.test(model=new_model, datamodule=dm)
+            print(path)
+            model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+            trainer.test(model=model, datamodule=dm)
 
 
 def check_home(cfg):

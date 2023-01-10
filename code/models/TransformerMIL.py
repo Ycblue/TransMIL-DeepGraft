@@ -4,6 +4,13 @@ import torch.nn.functional as F
 import numpy as np
 from nystrom_attention import NystromAttention
 
+try:
+    import apex
+    apex_available=True
+except ModuleNotFoundError:
+    # Error handling
+    apex_available = False
+    pass
 
 class TransLayer(nn.Module):
 
@@ -46,12 +53,25 @@ class PPEG(nn.Module):
 
 
 class TransformerMIL(nn.Module):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, in_features, out_features=512):
         super(TransformerMIL, self).__init__()
-        in_features = 1024
-        out_features = 512
+        # in_features = 2048
+        # out_features = 512
         # self.pos_layer = PPEG(dim=out_features)
-        self._fc1 = nn.Sequential(nn.Linear(in_features, out_features), nn.GELU())
+        if apex_available: 
+            norm_layer = apex.normalization.FusedLayerNorm
+        else:
+            norm_layer = nn.LayerNorm
+        if in_features == 2048:
+            self._fc1 = nn.Sequential(
+                nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
+                nn.Linear(int(in_features/2), out_features), nn.GELU(),
+                ) 
+        elif in_features == 1024:
+            self._fc1 = nn.Sequential(
+                # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
+                nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
+                ) 
         # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
         self.n_classes = n_classes
@@ -63,7 +83,7 @@ class TransformerMIL(nn.Module):
 
     def forward(self, x): #, **kwargs
 
-        h = x.float() #[B, n, 1024]
+        h = x.squeeze(0).float() #[B, n, 1024]
         h = self._fc1(h) #[B, n, 512]
         
         # print('Feature Representation: ', h.shape)
@@ -102,7 +122,7 @@ class TransformerMIL(nn.Module):
         #---->predict
         logits = self._fc2(h) #[B, n_classes]
         # return logits, attn2
-        return logits, attn1
+        return logits
 
 if __name__ == "__main__":
     data = torch.randn((1, 6000, 512)).cuda()

@@ -10,14 +10,14 @@ General:
     grad_acc: 2
     frozen_bn: False
     patience: 100
-    server: test #train #test
+    server: train #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_val_1.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -34,8 +34,8 @@ Model:
     name: TransformerMIL
     n_classes: 2
     backbone: features
-    in_features: 512
-    out_features: 1024
+    in_features: 2048
+    out_features: 512
 
 
 Optimizer:

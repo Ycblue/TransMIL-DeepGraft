@@ -27,10 +27,10 @@ def create_loss(args, n_classes, w1=1.0, w2=0.5):
     ### MulticlassJaccardLoss(classes=np.arange(11)
     # mode = args.base_loss #BINARY_MODE \MULTICLASS_MODE \MULTILABEL_MODE 
     loss = None
-    print(conf_loss)
+    # print(conf_loss)
     if hasattr(nn, conf_loss): 
         loss = getattr(nn, conf_loss)()
-        # loss = getattr(nn, conf_loss)(label_smoothing=0.5) 
+        # loss = getattr(nn, conf_loss)(label_smoothing=0.1) 
     #binary loss
     elif conf_loss == "focal":
         loss = FocalLoss_Ori(n_classes)

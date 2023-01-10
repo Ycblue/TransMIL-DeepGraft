@@ -19,6 +19,7 @@ from albumentations.pytorch import ToTensorV2
 from imgaug import augmenters as iaa
 import imgaug as ia
 from torchsampler import ImbalancedDatasetSampler
+from .utils import myTransforms
 
 
 
@@ -173,19 +174,48 @@ class JPGMILDataloader(data.Dataset):
 
     def __getitem__(self, index):
         # get data
+
+        color_transforms = myTransforms.Compose([
+            myTransforms.ColorJitter(
+                brightness = (0.65, 1.35), 
+                contrast = (0.5, 1.5),
+                # saturation=(0, 2), 
+                # hue=0.3,
+                ),
+            # myTransforms.RandomChoice([myTransforms.ColorJitter(saturation=(0, 2), hue=0.3),
+            #                             myTransforms.HEDJitter(theta=0.05)]),
+            myTransforms.HEDJitter(theta=0.005),
+            
+        ])
+        train_transforms = myTransforms.Compose([
+            myTransforms.RandomChoice([myTransforms.RandomHorizontalFlip(p=0.5),
+                                        myTransforms.RandomVerticalFlip(p=0.5),
+                                        myTransforms.AutoRandomRotation()]),
+        
+            myTransforms.RandomGaussBlur(radius=[0.5, 1.5]),
+            myTransforms.RandomAffineCV2(alpha=0.1),
+            myTransforms.RandomElastic(alpha=2, sigma=0.06),
+        ])
+
+
         (batch, batch_names), label, name, patient = self.get_data(index)
         out_batch = []
-        seq_img_d = self.train_transforms.to_deterministic()
+        # seq_img_d = self.train_transforms.to_deterministic()
         
         if self.mode == 'train':
             # print(img)
             # print(.shape)
             for img in batch: # expects numpy 
                 img = img.numpy().astype(np.uint8)
+
+
+                img = color_transforms(img)
+                img = train_transforms(img)
                 # img = self.albu_transforms(image=img)
                 # print(img)
                 # print(img.shape)
-                img = seq_img_d.augment_image(img)
+                # img = seq_img_d.augment_image(img)
+
                 img = self.val_transforms(img.copy())
                 # print(img)
                 out_batch.append(img)

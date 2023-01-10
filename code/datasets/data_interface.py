@@ -12,8 +12,8 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 # from .camel_dataloader import FeatureBagLoader
 from .custom_dataloader import HDF5MILDataloader
-# from .custom_jpg_dataloader import JPGMILDataloader
-from .simple_jpg_dataloader import JPGBagLoader
+from .jpg_dataloader import JPGMILDataloader
+from .classic_jpg_dataloader import JPGBagLoader
 from .zarr_feature_dataloader_simple import ZarrFeatureBagLoader
 from .feature_dataloader import FeatureBagLoader
 from pathlib import Path
@@ -124,7 +124,7 @@ import torch
 
 class MILDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_root: str, label_path: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, use_features=False, mixup=False, aug=False, *args, **kwargs):
+    def __init__(self, data_root: str, label_path: str, model_name: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, use_features=False, train_classic=False, mixup=False, aug=False, *args, **kwargs):
         super().__init__()
         self.data_root = data_root
         self.label_path = label_path
@@ -140,34 +140,43 @@ class MILDataModule(pl.LightningDataModule):
         self.seed = 1
         self.mixup = mixup
         self.aug = aug
+        self.train_classic = train_classic
+        self.max_bag_size = 1000
+        self.model_name = model_name
 
 
         self.class_weight = []
         self.cache = cache
         self.fe_transform = None
-        if not use_features: 
+        # print('use_features: ', use_features)
+        if self.train_classic: 
             self.base_dataloader = JPGBagLoader
+        elif not use_features: 
+            self.base_dataloader = JPGMILDataloader
         else: 
             self.base_dataloader = FeatureBagLoader
-            self.cache = True
+            # self.cache = True
 
     def setup(self, stage: Optional[str] = None) -> None:
         home = Path.cwd().parts[1]
 
         if stage in (None, 'fit'):
-            dataset = self.base_dataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug)
+            self.train_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug, model=self.model_name)
+            self.valid_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='val', n_classes=self.n_classes, cache=self.cache, model=self.model_name)
+
             # dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
-            print(len(dataset))
-            a = int(len(dataset)* 0.8)
-            b = int(len(dataset) - a)
-            self.train_data, self.valid_data = random_split(dataset, [a, b])
+            print('Train Data: ', len(self.train_data))
+            print('Val Data: ', len(self.valid_data))
+            # a = int(len(dataset)* 0.8)
+            # b = int(len(dataset) - a)
+            # self.train_data, self.valid_data = random_split(dataset, [a, b])
 
             # self.weights = self.get_weights(dataset)
 
 
 
         if stage in (None, 'test'):
-            self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False)
+            self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False, model=self.model_name, mixup=False, aug=False)
             print(len(self.test_data))
 
         return super().setup(stage=stage)
@@ -177,13 +186,17 @@ class MILDataModule(pl.LightningDataModule):
     def train_dataloader(self) -> DataLoader:
         # return DataLoader(self.train_data,  batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         # return DataLoader(self.train_data,  batch_size = self.batch_size, sampler = WeightedRandomSampler(self.weights, len(self.weights)), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
-        return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        if self.train_classic:
+            return DataLoader(self.train_data, batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        else:
+            return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+            # return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers, collate_fn=self.custom_collate) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data)
     def val_dataloader(self) -> DataLoader:
         return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
     
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.test_data, batch_size = self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.test_data, batch_size = 1, num_workers=self.num_workers)
 
     def get_weights(self, dataset):
 
@@ -201,6 +214,69 @@ class MILDataModule(pl.LightningDataModule):
 
         return torch.DoubleTensor(weights)
     
+    def custom_collate(self, batch):
+        # print(len(batch))
+        # print(len(batch))
+        for i in batch:
+            
+            bag, label, (wsi_name, patient) = i
+            print(bag.shape)
+        
+        # print(bag.shape)
+
+        # bag_size = bag.shape[0]
+        # bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+        # # bag_idxs = torch.randperm(bag_size)[:int(self.max_bag_size*(1-self.drop_rate))]
+        # out_bag = bag[bag_idxs, :]
+        # if self.mixup:
+        #     out_bag = self.get_mixup_bag(out_bag)
+        #     # batch_coords = 
+        # if out_bag.shape[0] < self.max_bag_size:
+        #     out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+
+        # # shuffle again
+        # out_bag_idxs = torch.randperm(out_bag.shape[0])
+        # out_bag = out_bag[out_bag_idxs]
+        # batch_coords = batch_coords[bag_idxs]
+
+        
+        # return out_bag, label, (wsi_name, batch_coords, patient)
+        return batch
+
+        
+    def get_mixup_bag(self, bag):
+
+        bag_size = bag.shape[0]
+
+        a = torch.rand([bag_size])
+        b = 0.6
+        rand_x = torch.randint(0, bag_size, [bag_size,])
+        rand_y = torch.randint(0, bag_size, [bag_size,])
+
+        bag_x = bag[rand_x, :]
+        bag_y = bag[rand_y, :]
+
+        temp_bag = (bag_x.t()*a).t() + (bag_y.t()*(1.0-a)).t()
+        # print('temp_bag: ', temp_bag.shape)
+
+        if bag_size < self.max_bag_size:
+            diff = self.max_bag_size - bag_size
+            bag_idxs = torch.randperm(bag_size)[:diff]
+            
+            # print('bag: ', bag.shape)
+            # print('bag_idxs: ', bag_idxs.shape)
+            mixup_bag = torch.cat((bag, temp_bag[bag_idxs, :]))
+            # print('mixup_bag: ', mixup_bag.shape)
+        else:
+            random_sample_list = torch.rand(bag_size)
+            mixup_bag = [bag[i] if random_sample_list[i] else temp_bag[i] > b for i in range(bag_size)] #make pytorch native?!
+            mixup_bag = torch.stack(mixup_bag)
+            # print('else')
+            # print(mixup_bag.shape)
+
+        return mixup_bag
+
+
 
 class DataModule(pl.LightningDataModule):
 
@@ -240,7 +316,7 @@ class DataModule(pl.LightningDataModule):
         return super().setup(stage=stage)
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data,  self.batch_size, shuffle=False,) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+        return DataLoader(self.train_data,  self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data),shuffle=False,) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data),
     def val_dataloader(self) -> DataLoader:
         return DataLoader(self.valid_data, batch_size = self.batch_size)
@@ -325,3 +401,4 @@ class CrossVal_MILDataModule(BaseKFoldDataModule):
 
 
 
+# if __name__ == '__main__':

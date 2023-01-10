@@ -58,19 +58,45 @@ class PPEG(nn.Module):
 
 
 class TransMIL(nn.Module):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, in_features, out_features=512):
         super(TransMIL, self).__init__()
-        in_features = 2048
-        inter_features = 1024
-        out_features = 512
+        # in_features = 2048
+        # inter_features = 1024
+        # inter_features_2 = 512
+        # out_features = 1024 
+        # out_features = 512 
         if apex_available: 
             norm_layer = apex.normalization.FusedLayerNorm
         else:
             norm_layer = nn.LayerNorm
 
         self.pos_layer = PPEG(dim=out_features)
-        self._fc1 = nn.Sequential(nn.Linear(in_features, inter_features), nn.GELU(), nn.Dropout(p=0.5), norm_layer(inter_features)) 
-        self._fc1_2 = nn.Sequential(nn.Linear(inter_features, out_features), nn.GELU())
+        # self._fc1 = nn.Sequential(nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(int(in_features/2))) # 2048 -> 1024
+        # self._fc1_1 = nn.Sequential(nn.Linear(int(in_features/2), int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(int(in_features/2))) # 2048 -> 1024
+        # self._fc1_2 = nn.Sequential(nn.Linear(int(in_features/2), int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(int(in_features/2))) # 2048 -> 1024
+        # self._fc2 = nn.Sequential(nn.Linear(int(in_features/2), int(in_features/4)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(int(in_features/4))) # 1024 -> 512
+        # self._fc3 = nn.Sequential(nn.Linear(int(in_features/4), out_features), nn.GELU()) # 512 -> 256
+
+
+
+        if in_features == 2048:
+            self._fc1 = nn.Sequential(
+                nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
+                nn.Linear(int(in_features/2), out_features), nn.GELU(),
+                ) 
+        elif in_features == 1024:
+            self._fc1 = nn.Sequential(
+                # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
+                nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
+                ) 
+        # out_features = 256 
+        # self._fc1 = nn.Sequential(
+        #     nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features)
+        #     ) 
+        # self._fc1_2 = nn.Sequential(nn.Linear(inter_features, inter_features_2), nn.GELU(), nn.Dropout(p=0.5), norm_layer(inter_features_2)) 
+        # self._fc1_3 = nn.Sequential(nn.Linear(inter_features_2, out_features), nn.GELU())
+        # self._fc1 = nn.Sequential(nn.Linear(in_features, 256), nn.GELU())
+        # self._fc1_2 = nn.Sequential(nn.Linear(int(in_features/2), out_features), nn.GELU())
         # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
@@ -79,7 +105,7 @@ class TransMIL(nn.Module):
         self.layer2 = TransLayer(norm_layer=norm_layer, dim=out_features)
         # self.norm = nn.LayerNorm(out_features)
         self.norm = norm_layer(out_features)
-        self._fc2 = nn.Linear(out_features, self.n_classes)
+        self._fc = nn.Linear(out_features, self.n_classes)
 
         # self.model_ft = ResNet.resnet50(num_classes=self.n_classes, mlp=False, two_branch=False, normlinear=True).to(self.device)
         # home = Path.cwd().parts[1]
@@ -94,11 +120,15 @@ class TransMIL(nn.Module):
     def forward(self, x): #, **kwargs
 
         # x = self.model_ft(x).unsqueeze(0)
-        h = x.squeeze(0).float() #[B, n, 1024]
+        if x.dim() > 3:
+            x = x.squeeze(0)
+        h = x.float() #[B, n, 1024]
         h = self._fc1(h) #[B, n, 512]
         # h = self.drop(h)
-        h = self._fc1_2(h) #[B, n, 512]
-        
+        # h = self._fc1_1(h) #[B, n, 512]
+        # h = self._fc1_2(h) #[B, n, 512]
+        # h = self._fc2(h) #[B, n, 512]
+        # h = self._fc3(h) #[B, n, 512]
         # print('Feature Representation: ', h.shape)
         #---->duplicate pad
         H = h.shape[1]
@@ -135,7 +165,7 @@ class TransMIL(nn.Module):
         h = self.norm(h)[:,0]
 
         #---->predict
-        logits = self._fc2(h) #[B, n_classes]
+        logits = self._fc(h) #[B, n_classes]
         # Y_hat = torch.argmax(logits, dim=1)
         # Y_prob = F.softmax(logits, dim = 1)
         # results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}

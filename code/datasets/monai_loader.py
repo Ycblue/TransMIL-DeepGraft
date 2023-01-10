@@ -111,10 +111,11 @@ if __name__ == '__main__':
         data_list_key="training",
         base_dir=data_root,
     )
+    
 
     train_transform = Compose(
         [
-            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=0, image_only=True, num_workers=8),
+            LoadImaged(keys=["image"], reader=WSIReader, backend="cucim", dtype=np.uint8, level=1, image_only=True, num_workers=8),
             LabelEncodeIntegerGraded(keys=["label"], num_classes=num_classes),
             RandGridPatchd(
                 keys=["image"],
@@ -133,7 +134,7 @@ if __name__ == '__main__':
             ToTensord(keys=["image", "label"]),
         ]
     )
-    train_data_list = data['training']
+    training_list = data['training']
     # dataset_train = Dataset(data=training_list)
     dataset_train = Dataset(data=training_list, transform=train_transform)
     # persistent_dataset = PersistentDataset(data=training_list, transform=train_transform, cache_dir='/home/ylan/workspace/test')

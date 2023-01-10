@@ -23,13 +23,14 @@ import h5py
 
 
 class FeatureBagLoader(data.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, cache=False, mixup=False, aug=False, data_cache_size=5000, max_bag_size=1000):
+    def __init__(self, file_path, label_path, mode, model, n_classes, cache=False, mixup=False, aug=False, data_cache_size=5000, max_bag_size=1000):
         super().__init__()
 
         self.data_info = []
         self.data_cache = {}
         self.slideLabelDict = {}
         self.files = []
+        self.labels = []
         self.data_cache_size = data_cache_size
         self.mode = mode
         self.file_path = file_path
@@ -48,7 +49,7 @@ class FeatureBagLoader(data.Dataset):
         self.missing = []
 
         home = Path.cwd().parts[1]
-        self.slide_patient_dict_path = f'/{home}/ylan/DeepGraft/training_tables/slide_patient_dict_an.json'
+        self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an.json'
         with open(self.slide_patient_dict_path, 'r') as f:
             self.slide_patient_dict = json.load(f)
 
@@ -59,25 +60,28 @@ class FeatureBagLoader(data.Dataset):
             # print(len(temp_slide_label_dict))
             for (x,y) in temp_slide_label_dict:
                 
+                x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_RETCCL_2048_HED')
                 x_name = Path(x).stem
-                x_path_list = [Path(self.file_path)/x]
-                # x_name = x.stem
-                # x_path_list = [Path(self.file_path)/ x for (x,y) in temp_slide_label_dict]
-                if self.aug:
-                    for i in range(5):
-                        aug_path = Path(self.file_path)/f'{x}_aug{i}'
-                        x_path_list.append(aug_path)
+                if x_name in self.slide_patient_dict.keys():
+                    x_path_list = [Path(self.file_path)/x]
+                    # x_name = x.stem
+                    # x_path_list = [Path(self.file_path)/ x for (x,y) in temp_slide_label_dict]
+                    if self.aug:
+                        for i in range(10):
+                            aug_path = Path(self.file_path)/f'{x}_aug{i}'
+                            x_path_list.append(aug_path)
 
-                for x_path in x_path_list: 
-                    
-                    if x_path.exists():
-                        self.slideLabelDict[x_name] = y
-                        self.files.append(x_path)
-                    elif Path(str(x_path) + '.zarr').exists():
-                        self.slideLabelDict[x] = y
-                        self.files.append(str(x_path)+'.zarr')
-                    else:
-                        self.missing.append(x)
+                    for x_path in x_path_list: 
+                        
+                        if x_path.exists():
+                            self.slideLabelDict[x_name] = y
+                            self.labels.append(int(y))
+                            self.files.append(x_path)
+                        elif Path(str(x_path) + '.zarr').exists():
+                            self.slideLabelDict[x] = y
+                            self.files.append(str(x_path)+'.zarr')
+                        else:
+                            self.missing.append(x)
                 # print(x, y)
                 # x_complete_path = Path(self.file_path)/Path(x)
                 # for cohort in Path(self.file_path).iterdir():
@@ -129,22 +133,24 @@ class FeatureBagLoader(data.Dataset):
         
 
         self.feature_bags = []
-        self.labels = []
+        
         self.wsi_names = []
         self.coords = []
         self.patients = []
         if self.cache:
             for t in tqdm(self.files):
                 # zarr_t = str(t) + '.zarr'
-                batch, label, (wsi_name, batch_coords, patient) = self.get_data(t)
+                batch, (wsi_name, batch_coords, patient) = self.get_data(t)
 
                 # print(label)
-                self.labels.append(label)
+                # self.labels.append(label)
                 self.feature_bags.append(batch)
                 self.wsi_names.append(wsi_name)
                 self.coords.append(batch_coords)
                 self.patients.append(patient)
-        
+        # else: 
+        #     for t in tqdm(self.files):
+        #         self.labels = 
 
     def get_data(self, file_path):
         
@@ -154,7 +160,7 @@ class FeatureBagLoader(data.Dataset):
         if wsi_name.split('_')[-1][:3] == 'aug':
             wsi_name = '_'.join(wsi_name.split('_')[:-1])
         # if wsi_name in self.slideLabelDict:
-        label = self.slideLabelDict[wsi_name]
+        # label = self.slideLabelDict[wsi_name]
         patient = self.slide_patient_dict[wsi_name]
 
         if Path(file_path).suffix == '.zarr':
@@ -171,11 +177,11 @@ class FeatureBagLoader(data.Dataset):
         # np_bag = np.array(z['data'][:])
         # np_bag = np.array(zarr.open(file_path, 'r')).astype(np.uint8)
         # label = torch.as_tensor(label)
-        label = int(label)
+        # label = int(label)
         wsi_bag = torch.from_numpy(np_bag)
         batch_coords = torch.from_numpy(coords)
 
-        return wsi_bag, label, (wsi_name, batch_coords, patient)
+        return wsi_bag, (wsi_name, batch_coords, patient)
     
     def get_labels(self, indices):
         # for i in indices: 
@@ -224,10 +230,6 @@ class FeatureBagLoader(data.Dataset):
         bag_x = bag[rand_x, :]
         bag_y = bag[rand_y, :]
 
-        # print('bag_x: ', bag_x.shape)
-        # print('bag_y: ', bag_y.shape)
-        # print('a*bag_x: ', (a*bag_x).shape)
-        # print('(1.0-a)*bag_y: ', ((1.0-a)*bag_y).shape)
 
         temp_bag = (bag_x.t()*a).t() + (bag_y.t()*(1.0-a)).t()
         # print('temp_bag: ', temp_bag.shape)
@@ -275,7 +277,9 @@ class FeatureBagLoader(data.Dataset):
             # return wsi, label, (wsi_name, batch_coords, patient)
         else:
             t = self.files[index]
-            bag, label, (wsi_name, batch_coords, patient) = self.get_data(t)
+            label = self.labels[index]
+            bag, (wsi_name, batch_coords, patient) = self.get_data(t)
+            # print(bag.shape)
             # label = torch.as_tensor(label)
             # label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
                 # self.labels.append(label)
@@ -283,34 +287,297 @@ class FeatureBagLoader(data.Dataset):
                 # self.wsi_names.append(wsi_name)
                 # self.name_batches.append(name_batch)
                 # self.patients.append(patient)
-        if self.mode == 'train':
-            bag_size = bag.shape[0]
+            if self.mode == 'train':
+                bag_size = bag.shape[0]
 
-            bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
-            # bag_idxs = torch.randperm(bag_size)[:int(self.max_bag_size*(1-self.drop_rate))]
-            out_bag = bag[bag_idxs, :]
-            if self.mixup:
-                out_bag = self.get_mixup_bag(out_bag)
-                # batch_coords = 
-            if out_bag.shape[0] < self.max_bag_size:
-                out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+                bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                # bag_idxs = torch.randperm(bag_size)[:int(self.max_bag_size*(1-self.drop_rate))]
+                out_bag = bag[bag_idxs, :]
+                if self.mixup:
+                    out_bag = self.get_mixup_bag(out_bag)
+                    # batch_coords = 
+                if out_bag.shape[0] < self.max_bag_size:
+                    out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
 
-            # shuffle again
-            out_bag_idxs = torch.randperm(out_bag.shape[0])
-            out_bag = out_bag[out_bag_idxs]
+                # shuffle again
+                out_bag_idxs = torch.randperm(out_bag.shape[0])
+                out_bag = out_bag[out_bag_idxs]
 
 
-            # batch_coords only useful for test
-            batch_coords = batch_coords[bag_idxs]
+                # batch_coords only useful for test
+                batch_coords = batch_coords[bag_idxs]
+                # out_bag = bag
+
+            # mixup? Linear combination of 2 vectors
+            # add noise
+
+
+            else: 
+                bag_size = bag.shape[0]
+                bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                out_bag = bag[bag_idxs, :]
+                if out_bag.shape[0] < self.max_bag_size:
+                    out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+                
+
+        return out_bag, label, (wsi_name, patient)
+        # return out_bag, label, (wsi_name, batch_coords, patient)
+
+class FeatureBagLoader_Mixed(data.Dataset):
+    def __init__(self, file_path, label_path, mode, n_classes, cache=False, mixup=False, aug=False, data_cache_size=5000, max_bag_size=1000):
+        super().__init__()
+
+        self.data_info = []
+        self.data_cache = {}
+        self.slideLabelDict = {}
+        self.files = []
+        self.labels = []
+        self.data_cache_size = data_cache_size
+        self.mode = mode
+        self.file_path = file_path
+        # self.csv_path = csv_path
+        self.label_path = label_path
+        self.n_classes = n_classes
+        self.max_bag_size = max_bag_size
+        self.drop_rate = 0.2
+        # self.min_bag_size = 120
+        self.empty_slides = []
+        self.corrupt_slides = []
+        self.cache = cache
+        self.mixup = mixup
+        self.aug = aug
+        
+        self.missing = []
+
+        home = Path.cwd().parts[1]
+        self.slide_patient_dict_path = f'/{home}/ylan/DeepGraft/training_tables/slide_patient_dict_an.json'
+        with open(self.slide_patient_dict_path, 'r') as f:
+            self.slide_patient_dict = json.load(f)
+
+        # read labels and slide_path from csv
+        with open(self.label_path, 'r') as f:
+            json_dict = json.load(f)
+            temp_slide_label_dict = json_dict[self.mode]
+            # print(len(temp_slide_label_dict))
+            for (x,y) in temp_slide_label_dict:
+                
+                x_name = Path(x).stem
+                x_path_list = [Path(self.file_path)/x]
+                # x_name = x.stem
+                # x_path_list = [Path(self.file_path)/ x for (x,y) in temp_slide_label_dict]
+                if self.aug:
+                    for i in range(5):
+                        aug_path = Path(self.file_path)/f'{x}_aug{i}'
+                        x_path_list.append(aug_path)
+
+                for x_path in x_path_list: 
+                    
+                    if x_path.exists():
+                        self.slideLabelDict[x_name] = y
+                        self.labels.append(int(y))
+                        self.files.append(x_path)
+                        for patch_path in x_path.iterdir():
+                            self.files.append((patch_path, x_name, y))
+
+
+        self.feature_bags = []
+        
+        self.wsi_names = []
+        self.coords = []
+        self.patients = []
+
+        if self.cache:
+            for t in tqdm(self.files):
+                # zarr_t = str(t) + '.zarr'
+                batch, (wsi_name, batch_coords, patient) = self.get_data(t)
+
+                # print(label)
+                # self.labels.append(label)
+                self.feature_bags.append(batch)
+                self.wsi_names.append(wsi_name)
+                self.coords.append(batch_coords)
+                self.patients.append(patient)
+        # else: 
+        #     for t in tqdm(self.files):
+        #         self.labels = 
+
+    # def create_bag(self):
+
+
+
+    def get_data(self, file_path):
+        
+        batch_names=[] #add function for name_batch read out
+
+        wsi_name = Path(file_path).stem
+        if wsi_name.split('_')[-1][:3] == 'aug':
+            wsi_name = '_'.join(wsi_name.split('_')[:-1])
+        # if wsi_name in self.slideLabelDict:
+        # label = self.slideLabelDict[wsi_name]
+        patient = self.slide_patient_dict[wsi_name]
+
+        if Path(file_path).suffix == '.zarr':
+            z = zarr.open(file_path, 'r')
+            np_bag = np.array(z['data'][:])
+            coords = np.array(z['coords'][:])
+        else:
+            with h5py.File(file_path, 'r') as hdf5_file:
+                np_bag = hdf5_file['features'][:]
+                coords = hdf5_file['coords'][:]
+
+        # np_bag = torch.load(file_path)
+        # z = zarr.open(file_path, 'r')
+        # np_bag = np.array(z['data'][:])
+        # np_bag = np.array(zarr.open(file_path, 'r')).astype(np.uint8)
+        # label = torch.as_tensor(label)
+        # label = int(label)
+        wsi_bag = torch.from_numpy(np_bag)
+        batch_coords = torch.from_numpy(coords)
+
+        return wsi_bag, (wsi_name, batch_coords, patient)
+    
+    def get_labels(self, indices):
+        # for i in indices: 
+        #     print(self.labels[i])
+        return [self.labels[i] for i in indices]
+
+
+    def to_fixed_size_bag(self, bag, names, bag_size: int = 512):
+
+        #duplicate bag instances unitl 
+
+        bag_idxs = torch.randperm(bag.shape[0])[:bag_size]
+        bag_samples = bag[bag_idxs]
+        name_samples = [names[i] for i in bag_idxs]
+        # bag_sample_names = [bag_names[i] for i in bag_idxs]
+        # q, r  = divmod(bag_size, bag_samples.shape[0])
+        # if q > 0:
+        #     bag_samples = torch.cat([bag_samples]*q, 0)
+
+        # self_padded = torch.cat([bag_samples, bag_samples[:r,:, :, :]])
+
+        # zero-pad if we don't have enough samples
+        # zero_padded = torch.cat((bag_samples,
+        #                         torch.zeros(bag_size-bag_samples.shape[0], bag_samples.shape[1], bag_samples.shape[2], bag_samples.shape[3])))
+
+        return bag_samples, name_samples, min(bag_size, len(bag))
+
+    def data_dropout(self, bag, batch_names, drop_rate):
+        # bag_size = self.max_bag_size
+        bag_size = bag.shape[0]
+        bag_idxs = torch.randperm(self.max_bag_size)[:int(bag_size*(1-drop_rate))]
+        bag_samples = bag[bag_idxs]
+        name_samples = [batch_names[i] for i in bag_idxs]
+
+        return bag_samples, name_samples
+
+    def get_mixup_bag(self, bag):
+
+        bag_size = bag.shape[0]
+
+        a = torch.rand([bag_size])
+        b = 0.6
+        rand_x = torch.randint(0, bag_size, [bag_size,])
+        rand_y = torch.randint(0, bag_size, [bag_size,])
+
+        bag_x = bag[rand_x, :]
+        bag_y = bag[rand_y, :]
+
+
+        temp_bag = (bag_x.t()*a).t() + (bag_y.t()*(1.0-a)).t()
+        # print('temp_bag: ', temp_bag.shape)
+
+        if bag_size < self.max_bag_size:
+            diff = self.max_bag_size - bag_size
+            bag_idxs = torch.randperm(bag_size)[:diff]
             
+            # print('bag: ', bag.shape)
+            # print('bag_idxs: ', bag_idxs.shape)
+            mixup_bag = torch.cat((bag, temp_bag[bag_idxs, :]))
+            # print('mixup_bag: ', mixup_bag.shape)
+        else:
+            random_sample_list = torch.rand(bag_size)
+            mixup_bag = [bag[i] if random_sample_list[i] else temp_bag[i] > b for i in range(bag_size)] #make pytorch native?!
+            mixup_bag = torch.stack(mixup_bag)
+            # print('else')
+            # print(mixup_bag.shape)
 
-        # mixup? Linear combination of 2 vectors
-        # add noise
+        return mixup_bag
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, index):
+
+        if self.cache:
+            label = self.labels[index]
+            bag = self.feature_bags[index]
+            
+        
+            
+            # label = Variable(Tensor(label))
+            # label = torch.as_tensor(label)
+            # label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
+            wsi_name = self.wsi_names[index]
+            batch_coords = self.coords[index]
+            patient = self.patients[index]
+
+            
+            #random dropout
+            #shuffle
+
+            # feats = Variable(Tensor(feats))
+            # return wsi, label, (wsi_name, batch_coords, patient)
+        else:
+            t = self.files[index]
+            label = self.labels[index]
+            bag, (wsi_name, batch_coords, patient) = self.get_data(t)
+            # print(bag.shape)
+            # label = torch.as_tensor(label)
+            # label = torch.nn.functional.one_hot(label, num_classes=self.n_classes)
+                # self.labels.append(label)
+                # self.feature_bags.append(batch)
+                # self.wsi_names.append(wsi_name)
+                # self.name_batches.append(name_batch)
+                # self.patients.append(patient)
+            if self.mode == 'train':
+                bag_size = bag.shape[0]
+
+                bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                # bag_idxs = torch.randperm(bag_size)[:int(self.max_bag_size*(1-self.drop_rate))]
+                out_bag = bag[bag_idxs, :]
+                if self.mixup:
+                    out_bag = self.get_mixup_bag(out_bag)
+                    # batch_coords = 
+                if out_bag.shape[0] < self.max_bag_size:
+                    out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+
+                # shuffle again
+                out_bag_idxs = torch.randperm(out_bag.shape[0])
+                out_bag = out_bag[out_bag_idxs]
 
 
-        else: out_bag = bag
+                # batch_coords only useful for test
+                batch_coords = batch_coords[bag_idxs]
+                # out_bag = bag
 
-        return out_bag, label, (wsi_name, batch_coords, patient)
+            # mixup? Linear combination of 2 vectors
+            # add noise
+
+
+            # elif self.mode == 'val': 
+            #     bag_size = bag.shape[0]
+            #     bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+            #     out_bag = bag[bag_idxs, :]
+            #     if out_bag.shape[0] < self.max_bag_size:
+            #         out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+            else:
+                # bag_size = bag.shape[0]
+                out_bag = bag
+
+
+        return out_bag, label, (wsi_name, patient)
+
 
 if __name__ == '__main__':
     
@@ -328,23 +595,24 @@ if __name__ == '__main__':
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
     # label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
-    label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_test.json'
+    label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_limit_5_split_PAS_HE_Jones_norm_rest_test.json'
     output_dir = f'/{data_root}/debug/augments'
     os.makedirs(output_dir, exist_ok=True)
 
     n_classes = 2
 
-    dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, mixup=True, aug=True, n_classes=n_classes)
+    train_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, mixup=True, aug=True, n_classes=n_classes)
+    val_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='val', cache=False, mixup=False, aug=False, n_classes=n_classes)
 
     test_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes)
 
     # print(dataset.get_labels(0))
-    a = int(len(dataset)* 0.8)
-    b = int(len(dataset) - a)
-    train_data, valid_data = random_split(dataset, [a, b])
+    # a = int(len(dataset)* 0.8)
+    # b = int(len(dataset) - a)
+    # train_data, valid_data = random_split(dataset, [a, b])
 
-    train_dl = DataLoader(train_data, batch_size=1, num_workers=5)
-    valid_dl = DataLoader(valid_data, batch_size=1, num_workers=5)
+    train_dl = DataLoader(train_dataset, batch_size=1, sampler=ImbalancedDatasetSampler(train_dataset), num_workers=5)
+    valid_dl = DataLoader(val_dataset, batch_size=1, num_workers=5)
     test_dl = DataLoader(test_dataset)
 
     print('train_dl: ', len(train_dl))
@@ -371,7 +639,7 @@ if __name__ == '__main__':
     # start = time.time()
     for i in range(epochs):
         start = time.time()
-        for item in tqdm(train_dl): 
+        for item in tqdm(valid_dl): 
 
             # if c >= 10:
             #     break

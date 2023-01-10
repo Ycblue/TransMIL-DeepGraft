@@ -16,14 +16,14 @@ General:
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_img_val_1.json'
     fold: 1
     nfold: 3
     cross_val: False
 
     train_dataloader:
-        batch_size: 1 
+        batch_size: 5 
         num_workers: 4
 
     test_dataloader:
@@ -34,8 +34,8 @@ Model:
     name: TransMIL
     n_classes: 2
     backbone: retccl
-    in_features: 512
-    out_features: 1024
+    in_features: 2048
+    out_features: 512
 
 
 Optimizer:
