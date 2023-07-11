@@ -35,3 +35,9 @@ wd = 0.01
 
     * 
 
+# Instructions
+
+* Train model
+* Validate model to generate topk patient lists for each patient
+* Test model
+* visualize with visualize_classic.py or visualize_mil.py

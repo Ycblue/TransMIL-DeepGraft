@@ -9,7 +9,7 @@ from datasets.data_interface import MILDataModule, CrossVal_MILDataModule
 # from datasets.data_interface import DataInterface, MILDataModule, CrossVal_MILDataModule
 from models.model_interface import ModelInterface
 from models.model_interface_classic import ModelInterface_Classic
-from models.model_interface_dtfd import ModelInterface_DTFD
+# from models.model_interface_dtfd import ModelInterface_DTFD
 import models.vision_transformer as vits
 from utils.utils import *
 
@@ -18,44 +18,44 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.strategies import DDPStrategy
 import torch
-from train_loop import KFoldLoop
-from pytorch_lightning.plugins.training_type import DDPPlugin
+# from train_loop import KFoldLoop
+# from pytorch_lightning.plugins.training_type import DDPPlugin
 
 
-try:
-    import apex
-    from apex.parallel import DistributedDataParallel
-    print('Apex available.')
-except ModuleNotFoundError:
-    # Error handling
-    pass
+# try:
+#     import apex
+#     from apex.parallel import DistributedDataParallel
+#     print('Apex available.')
+# except ModuleNotFoundError:
+#     # Error handling
+#     pass
 
-def unwrap_lightning_module(wrapped_model):
-    from apex.parallel import DistributedDataParallel
-    from pytorch_lightning.overrides.base import (
-        _LightningModuleWrapperBase,
-        _LightningPrecisionModuleWrapperBase,
-    )
+# def unwrap_lightning_module(wrapped_model):
+#     from apex.parallel import DistributedDataParallel
+#     from pytorch_lightning.overrides.base import (
+#         _LightningModuleWrapperBase,
+#         _LightningPrecisionModuleWrapperBase,
+#     )
 
-    model = wrapped_model
-    if isinstance(model, DistributedDataParallel):
-        model = unwrap_lightning_module(model.module)
-    if isinstance(
-        model, (_LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase)
-    ):
-        model = unwrap_lightning_module(model.module)
-    return model
+#     model = wrapped_model
+#     if isinstance(model, DistributedDataParallel):
+#         model = unwrap_lightning_module(model.module)
+#     if isinstance(
+#         model, (_LightningModuleWrapperBase, _LightningPrecisionModuleWrapperBase)
+#     ):
+#         model = unwrap_lightning_module(model.module)
+#     return model
 
 
-class ApexDDPPlugin(DDPPlugin):
-    def _setup_model(self, model):
-        from apex.parallel import DistributedDataParallel
+# class ApexDDPPlugin(DDPPlugin):
+#     def _setup_model(self, model):
+#         from apex.parallel import DistributedDataParallel
 
-        return DistributedDataParallel(model, delay_allreduce=False)
+#         return DistributedDataParallel(model, delay_allreduce=False)
 
-    @property
-    def lightning_module(self):
-        return unwrap_lightning_module(self._model)
+#     @property
+#     def lightning_module(self):
+#         return unwrap_lightning_module(self._model)
 
 
 
@@ -74,6 +74,8 @@ def make_parse():
     # parser.add_argument('--batch_size', default = 1, type=int)
     parser.add_argument('--resume_training', action='store_true')
     parser.add_argument('--label_file', type=str)
+    # parser.add_argument('--from_ft', action='store_true')
+    parser.add_argument('--fine_tune', action='store_true')
     
 
     args = parser.parse_args()
@@ -83,6 +85,7 @@ def make_parse():
 def main(cfg):
 
     torch.set_num_threads(8)
+    torch.set_float32_matmul_precision('high')
 
     #---->Initialize seed
     pl.seed_everything(cfg.General.seed)
@@ -106,14 +109,16 @@ def main(cfg):
     home = Path.cwd().parts[1]
 
     train_classic = False
-    if cfg.Model.name in ['inception', 'resnet18', 'resnet50', 'vit']:
+    if cfg.Model.name in ['inception', 'resnet18', 'resnet50', 'vit', 'efficientnet']:
         train_classic = True
         use_features = False
 
-
     if cfg.Model.backbone == 'features':
         use_features = True
+    # elif cfg.Model.backbone == 'simple':
+    #     use_features = False
     else: use_features = False
+    
     DataInterface_dict = {
                 'data_root': cfg.Data.data_dir,
                 'label_path': cfg.Data.label_file,
@@ -133,7 +138,6 @@ def main(cfg):
         dm = CrossVal_MILDataModule(**DataInterface_dict)
     else: dm = MILDataModule(**DataInterface_dict)
     
-
     #---->Define Model
     
     ModelInterface_dict = {'model': cfg.Model,
@@ -166,23 +170,28 @@ def main(cfg):
             max_epochs= cfg.General.epochs,
             min_epochs = 500,
             accelerator='gpu',
+            # strategy='ddp',
             # plugins=plugins,
             devices=cfg.General.gpus,
-            strategy=DDPStrategy(find_unused_parameters=False),
-            replace_sampler_ddp=False,
-            amp_backend='native',
+            # replace_sampler_ddp=False,
+            # amp_backend='native',
+            # precision='16-mixed',  
             precision=cfg.General.precision,  
             # accumulate_grad_batches=cfg.General.grad_acc,
+            use_distributed_sampler=False,
+            enable_progress_bar=True,
             gradient_clip_val=0.0,
             # fast_dev_run = True,
             # limit_train_batches=1,
             
             # deterministic=True,
-            check_val_every_n_epoch=1,
+            accumulate_grad_batches=10,
+            check_val_every_n_epoch=5,
         )
     else:
         trainer = Trainer(
-            # num_sanity_val_steps=0, 
+            # deterministic=True,
+            num_sanity_val_steps=-1, 
             logger=cfg.load_loggers,
             callbacks=cfg.callbacks,
             max_epochs= cfg.General.epochs,
@@ -191,9 +200,10 @@ def main(cfg):
             # gpus=cfg.General.gpus,
             accelerator='gpu',
             devices=cfg.General.gpus,
-            amp_backend='native',
+            # amp_backend='native',
             # amp_level=cfg.General.amp_level,  
-            precision=cfg.General.precision,  
+            precision='16-mixed',  
+            # precision=cfg.General.precision,  
             accumulate_grad_batches=cfg.General.grad_acc,
             gradient_clip_val=0.0,
             log_every_n_steps=10,
@@ -202,7 +212,7 @@ def main(cfg):
             
             # deterministic=True,
             # num_sanity_val_steps=0,
-            check_val_every_n_epoch=1,
+            check_val_every_n_epoch=5,
         )
     # print(cfg.log_path)
     # print(trainer.loggers[0].log_dir)
@@ -219,9 +229,13 @@ def main(cfg):
         shutil.copytree(copy_origin, copy_path, dirs_exist_ok=True)
 
     #---->train or test
-    if cfg.resume_training:
-        last_ckpt = log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'last.ckpt'
-        trainer.fit(model = model, ckpt_path=last_ckpt) #, datamodule = dm
+    # if cfg.resume_training:
+    #     last_ckpt = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'last.ckpt'
+    #     print('Resume Training from: ', last_ckpt)
+    #     model = model.load_from_checkpoint(checkpoint_path=last_ckpt, cfg=cfg)
+    #     # trainer.fit(model = model, ckpt_path=last_ckpt) #, datamodule = dm
+    #     trainer.fit(model, dm)
+    # print(cfg.resume_training)
 
     if cfg.General.server == 'train':
 
@@ -231,13 +245,22 @@ def main(cfg):
             trainer.fit_loop = KFoldLoop(cfg.Data.nfold, export_path = cfg.log_path, **ModelInterface_dict)
             trainer.fit_loop.connect(internal_fit_loop)
             trainer.fit(model, dm)
-        else:
+        elif cfg.resume_training:
+            last_ckpt = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'checkpoints' / 'last.ckpt'
+            print('Resume Training from: ', last_ckpt)
+            model = model.load_from_checkpoint(checkpoint_path=last_ckpt, cfg=cfg)
+            # trainer.fit(model = model, ckpt_path=last_ckpt) #, datamodule = dm
+            trainer.fit(model, dm)
+        else:                                                   
             trainer.fit(model = model, datamodule = dm)
+            # trainer.test(model = model, datamodule = dm)
     else:
+        # if cfg.fine_tune:
+        #    log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}'/'checkpoints' 
+        # else:
         log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}'/'checkpoints' 
 
         model_paths = list(log_path.glob('*.ckpt'))
-
 
         if cfg.epoch == 'last':
             model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
@@ -247,10 +270,15 @@ def main(cfg):
         else:
             model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
         # model_paths = [f'{log_path}/epoch=279-val_loss=0.4009.ckpt']
-
-        for path in model_paths:
-            print(path)
-            model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        # print(model_paths)
+        
+        # for path in model_paths:
+        path  = model_paths[0]
+            # print(path)
+        model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        if cfg.General.server == 'val':
+            trainer.validate(model=model, datamodule=dm)
+        elif cfg.General.server == 'test':
             trainer.test(model=model, datamodule=dm)
 
 
@@ -291,6 +319,9 @@ if __name__ == '__main__':
     cfg.Loss.base_loss = args.loss
     cfg.Data.bag_size = args.bag_size
     cfg.version = args.version
+    cfg.fine_tune = args.fine_tune
+    cfg.resume_training = args.resume_training
+
     if args.label_file: 
         cfg.Data.label_file = '/home/ylan/DeepGraft/training_tables/' + args.label_file
 
@@ -307,7 +338,8 @@ if __name__ == '__main__':
     cfg.task = task
     # task = Path(cfg.config).name[:-5].split('_')[2:][0]
     cfg.log_path = log_path / f'{cfg.Model.name}' / task / log_name 
-
+    cfg.log_name = log_name
+    print(cfg.task)
 
 
     cfg.epoch = args.epoch

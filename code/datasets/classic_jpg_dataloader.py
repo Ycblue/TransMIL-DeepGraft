@@ -19,10 +19,13 @@ import json
 from imgaug import augmenters as iaa
 from torchsampler import ImbalancedDatasetSampler
 from .utils import myTransforms
+from transformers import ViTFeatureExtractor
+import torchvision.models as models
+import torch.nn as nn
 
 
 class JPGBagLoader(data_utils.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, model='inception'):
+    def __init__(self, file_path, label_path, mode, n_classes, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, model=''):
         super().__init__()
 
         self.data_info = []
@@ -43,10 +46,15 @@ class JPGBagLoader(data_utils.Dataset):
         self.labels = []
         if model == 'inception':
             size = 299
-        elif model == 'vit':
-            size = 384
+        # elif model == 'vit':
+        #     size = 384
         else: size = 224
-
+        
+        home = Path.cwd().parts[1]
+        self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an.json'
+        # self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an.json'
+        with open(self.slide_patient_dict_path, 'r') as f:
+            self.slide_patient_dict = json.load(f)
         
         # read labels and slide_path from csv
         with open(self.label_path, 'r') as f:
@@ -55,18 +63,18 @@ class JPGBagLoader(data_utils.Dataset):
             # print(len(temp_slide_label_dict))
             for (x,y) in temp_slide_label_dict:
                 x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
-                # print(x)
                 x_name = Path(x).stem
                 x_path_list = [Path(self.file_path)/x]
-                for x_path in x_path_list:
-                    if x_path.exists():
-                        # print(len(list(x_path.glob('*'))))
+                if x_name in self.slide_patient_dict.keys():
+                    for x_path in x_path_list:
+                        if x_path.exists():
+                            # print(len(list(x_path.glob('*'))))
 
-                        self.slideLabelDict[x_name] = y
-                        self.labels += [int(y)]*len(list(x_path.glob('*')))
-                        # self.labels.append(int(y))
-                        for patch in x_path.iterdir():
-                            self.files.append((patch, x_name, y))
+                            self.slideLabelDict[x_name] = y
+                            self.labels += [int(y)]*len(list(x_path.glob('*')))
+                            # self.labels.append(int(y))
+                            for patch in x_path.iterdir():
+                                self.files.append((patch, x_name, y))
 
         # with open(self.label_path, 'r') as f:
         #     temp_slide_label_dict = json.load(f)[mode]
@@ -83,11 +91,8 @@ class JPGBagLoader(data_utils.Dataset):
         #                     self.files.append(x_complete_path)
         #                 else: self.empty_slides.append(x_complete_path)
         
-        home = Path.cwd().parts[1]
-        self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an.json'
-        # self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an.json'
-        with open(self.slide_patient_dict_path, 'r') as f:
-            self.slide_patient_dict = json.load(f)
+        
+
 
 
         self.color_transforms = myTransforms.Compose([
@@ -102,9 +107,9 @@ class JPGBagLoader(data_utils.Dataset):
             myTransforms.HEDJitter(theta=0.005),
             
         ])
-        self.color_transforms = myTransforms.Compose([
-            myTransforms.Grayscale(num_output_channels=3)
-        ])
+        # self.color_transforms = myTransforms.Compose([
+        #     myTransforms.Grayscale(num_output_channels=3)
+        # ])
         self.train_transforms = myTransforms.Compose([
             myTransforms.RandomChoice([myTransforms.RandomHorizontalFlip(p=0.5),
                                         myTransforms.RandomVerticalFlip(p=0.5),
@@ -115,7 +120,7 @@ class JPGBagLoader(data_utils.Dataset):
             myTransforms.RandomElastic(alpha=2, sigma=0.06),
         ])
 
-        self.resize_transforms = transforms.Resize((299,299), transforms.InterpolationMode.BICUBIC)
+        self.resize_transforms = transforms.Resize((size,size), transforms.InterpolationMode.BICUBIC)
 
         # sometimes = lambda aug: iaa.Sometimes(0.5, aug, name="Random1")
         # sometimes2 = lambda aug: iaa.Sometimes(0.2, aug, name="Random2")
@@ -142,6 +147,9 @@ class JPGBagLoader(data_utils.Dataset):
         #     # ], name="MyOneOf")
 
         # ], name="MyAug")
+        # if self.model == 'vit':
+        #     model_name_or_path = 'models/ckpt/vit-base-patch16-224-in21k/'
+        #     self.val_transforms = ViTFeatureExtractor.from_pretrained(model_name_or_path)
         self.val_transforms = transforms.Compose([
             # 
             transforms.ToTensor(),
@@ -236,7 +244,10 @@ class JPGBagLoader(data_utils.Dataset):
                 # t = self.files[index]
                 # label = self.labels[index]
                 img, label, (wsi_name, tile_name, patient) = self.get_data(t)
-                save_img(img, f'{tile_name}_original')
+                # save_img(img, f'{tile_name}_original')
+                # if self.model == 'vit':
+                #     img = self.val_transforms(img, return_tesnors='pt')
+                # else:
                 img = self.resize_transforms(img)
                 img = self.color_transforms(img)
                 img = self.train_transforms(img)
@@ -254,6 +265,9 @@ class JPGBagLoader(data_utils.Dataset):
                 # seq_img_d = self.train_transforms.to_deterministic()
                 # seq_img_resize = self.resize_transforms.to_deterministic()
                 # img = img.numpy().astype(np.uint8)
+                # if self.model == 'vit':
+                #     img = self.val_transforms(img, return_tesnors='pt')
+            # else:
                 img = self.resize_transforms(img)
                 # img = np.moveaxis(img, 0, 2)
                 img = self.val_transforms(img)
@@ -282,13 +296,13 @@ if __name__ == '__main__':
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
     # label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
-    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_limit_5_split_PAS_HE_Jones_norm_rest_test.json'
+    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
     # output_dir = f'/{data_root}/debug/augments'
     # os.makedirs(output_dir, exist_ok=True)
 
     n_classes = 2
 
-    dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', n_classes=n_classes, cache=False)
+    dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', model='vit', n_classes=n_classes, cache=False)
     # dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', n_classes=n_classes, cache=False)
 
     # print(dataset.get_labels(0))
@@ -300,20 +314,37 @@ if __name__ == '__main__':
     # b = int(len(dataset) - a)
     # train_ds, val_ds = torch.utils.data.random_split(dataset, [a, b])
     # dl = FastTensorDataLoader(dataset, batch_size=1, shuffle=False)
-    dl = DataLoader(dataset, batch_size=5, num_workers=8, pin_memory=True)
+    dl = DataLoader(dataset, batch_size=100, num_workers=8, pin_memory=True)
     # print(len(dl))
     # dl = DataLoader(dataset, batch_size=1, sampler=ImbalancedDatasetSampler(dataset), num_workers=5)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     scaler = torch.cuda.amp.GradScaler()
 
-    model_ft = resnet50_baseline(pretrained=True)
-    for param in model_ft.parameters():
-        param.requires_grad = False
-    model_ft.to(device)
+    # model_ft = resnet50_baseline(pretrained=True)
+    # for param in model_ft.parameters():
+    #     param.requires_grad = False
+    # model_ft.to(device)
+
+    model_ft = models.resnet50(weights='IMAGENET1K_V1')
+
+    
+    ct = 0
+    for child in model_ft.children():
+        ct += 1
+        if ct < len(list(model_ft.children())) - 3:
+            for parameter in child.parameters():
+                parameter.requires_grad=False
+    model_ft.fc = nn.Linear(model_ft.fc.in_features, 2)
+
+    # print(model_ft)
+
+    # print(list(model_ft.children())[:7])
+    #     for parameter in child.parameters():
+    #         print(parameter.requires_grad)    
     
     c = 0
-    label_count = [0] *n_classes
-    # print(len(dl))
+    # label_count = [0] *n_classes
+    # # print(len(dl))
     start = time.time()
     for item in tqdm(dl): 
 

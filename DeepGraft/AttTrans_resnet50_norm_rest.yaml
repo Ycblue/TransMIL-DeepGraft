@@ -16,14 +16,14 @@ General:
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128uM_annotated/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_limit_100_split_PAS_HE_Jones_norm_rest.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_val_1.json'
     fold: 1
     nfold: 3
     cross_val: False
 
     train_dataloader:
-        batch_size: 1 
+        batch_size: 10
         num_workers: 4
 
     test_dataloader:

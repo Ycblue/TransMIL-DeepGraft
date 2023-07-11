@@ -26,10 +26,8 @@ With this project, we aim to esatablish a benchmark for weakly supervised deep l
 For our Benchmark, we chose the following models: 
 
 - AttentionMIL
-- Resnet18/50
 - ViT
 - CLAM
-- TransMIL
 - Monai MIL (optional)
 
 Resnet18 and Resnet50 are basic CNNs that can be applied for a variety of tasks. Although domain or task specific architectures mostly outperform them, they remain a good baseline for comparison. 
@@ -75,6 +73,8 @@ These experiments may vary depending on the results from previous experiments
 - (4) Normal vs TCMR vs Mixed vs ABMR vs Viral vs Others
 - (5) TCMR vs Mixed vs ABMR
 
+- use structural Segmentations to guide attention
+
 ## Plan:
 
 1. Train models for current tasks on AMS+Utrecht -> Validate on Aachen
@@ -100,3 +100,27 @@ Notes:
     - (mixing in 10 slides from Aachen increases auc performance from 0.7 to 0.89)
 - AttentionMIL: WIP
 - Monai MIL: WIP
+
+# Figure Parts: 
+
+- TransMIL:
+    * norm_rest: 
+        * AUROC, PR-AUROC, ConfMatrix, 
+        * GradCAM Slides of TopK Patients
+    * rej_rest: 
+        * AUROC, PR-AUROC, ConfMatrix, 
+        * GradCAM Slides of TopK Patients
+    * norm_rej_rest: 
+        * AUROC, PR-AUROC, ConfMatrix, 
+        * GradCAM Slides of TopK Patients
+
+
+
+# Future Ideas:
+
+- merge with segmentation models (let model only see glomerulus in WSI?)
+- cam guided loss (for example focus on glomerulus structures) 
+- use cTransPath or other feature extractors? 
+- are end to end methods better than Feature Extractor + Pooling? 
+- rejections: multilabel problem? 
+    - separately train two models for TCMR and ABMR each. Use Mixed in both datasets as positive?

@@ -1,0 +1,20 @@
+2023-03-06 15:43:23,996 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-03-06 15:43:23,999 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/gpu/nvidia.py", line 158, in get_nvidia_gpu_power
+    outs, errors = p.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/subprocess.py", line 1121, in communicate
+    stdout = self.stdout.read()
+
+2023-03-06 15:43:32,772 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-03-06 15:43:32,774 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/disk/common.py", line 38, in measure_disk_speed_at_dir
+    writetofile(filename, filesize)
+  File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/disk/common.py", line 20, in writetofile
+    f.close()
+

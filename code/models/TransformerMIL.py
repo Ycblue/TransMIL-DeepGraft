@@ -57,7 +57,12 @@ class TransformerMIL(nn.Module):
         super(TransformerMIL, self).__init__()
         # in_features = 2048
         # out_features = 512
-        # self.pos_layer = PPEG(dim=out_features)
+        self.pos_layer_0 = PPEG(dim=out_features)
+        self.pos_layer_1 = PPEG(dim=out_features)
+        self.pos_layer_2 = PPEG(dim=out_features)
+        self.pos_layer_3 = PPEG(dim=out_features)
+        self.pos_layer_4 = PPEG(dim=out_features)
+        self.pos_layer_5 = PPEG(dim=out_features)
         if apex_available: 
             norm_layer = apex.normalization.FusedLayerNorm
         else:
@@ -76,7 +81,18 @@ class TransformerMIL(nn.Module):
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
         self.n_classes = n_classes
         self.layer1 = TransLayer(dim=out_features)
-        # self.layer2 = TransLayer(dim=out_features)
+        self.layer2 = TransLayer(dim=out_features)
+        self.layer3 = TransLayer(dim=out_features)
+        self.layer4 = TransLayer(dim=out_features)
+        self.layer5 = TransLayer(dim=out_features)
+        self.layer6 = TransLayer(dim=out_features)
+        self.layer7 = TransLayer(dim=out_features)
+        self.layer8 = TransLayer(dim=out_features)
+        self.layer9 = TransLayer(dim=out_features)
+        self.layer10 = TransLayer(dim=out_features)
+        self.layer11 = TransLayer(dim=out_features)
+        self.layer12 = TransLayer(dim=out_features)
+        # self.layer4 = TransLayer(dim=out_features)
         self.norm = nn.LayerNorm(out_features)
         self._fc2 = nn.Linear(out_features, self.n_classes)
 
@@ -101,9 +117,23 @@ class TransformerMIL(nn.Module):
 
 
         #---->Translayer x1
-        h, attn1 = self.layer1(h) #[B, N, 512]
-
-        
+        h, _ = self.layer1(h) #[B, N, 512]
+        h = self.pos_layer_0(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer2(h) #[B, N, 512]
+        h = self.pos_layer_1(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer4(h) #[B, N, 512]
+        h = self.pos_layer_2(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer5(h) #[B, N, 512]
+        h = self.pos_layer_3(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer6(h) #[B, N, 512]
+        h = self.pos_layer_4(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer7(h) #[B, N, 512]
+        h = self.pos_layer_5(h, _H, _W) #[B, N, 512]
+        h, _ = self.layer8(h) #[B, N, 512]
+        h, _ = self.layer9(h) #[B, N, 512]
+        # h, _ = self.layer10(h) #[B, N, 512]
+        # h, _ = self.layer11(h) #[B, N, 512]
+        # h, _ = self.layer12(h) #[B, N, 512]
 
         # print('After first TransLayer: ', h.shape)
 

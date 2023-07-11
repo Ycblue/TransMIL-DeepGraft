@@ -32,12 +32,12 @@ class TransLayer(nn.Module):
         )
 
     def forward(self, x):
-        out= self.attn(self.norm(x))
-        # out, attn = self.attn(self.norm(x))
+        # out= self.attn(self.norm(x))
+        out, attn = self.attn(self.norm(x), return_attn=True)
         x = x + out
         # x = x + self.attn(self.norm(x))
 
-        return x
+        return x, attn
 
 
 class PPEG(nn.Module):
@@ -89,6 +89,11 @@ class TransMIL(nn.Module):
                 # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
                 nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
                 ) 
+        elif in_features == 768:
+            self._fc1 = nn.Sequential(
+                nn.Linear(in_features, int(in_features)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(in_features),
+                nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
+                ) 
         # out_features = 256 
         # self._fc1 = nn.Sequential(
         #     nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features)
@@ -120,15 +125,15 @@ class TransMIL(nn.Module):
     def forward(self, x): #, **kwargs
 
         # x = self.model_ft(x).unsqueeze(0)
+        # print(x.shape)
+        # x = x.unsqueeze(0) # needed for feature extractorVisualization!!!
+        # print(x.shape)
         if x.dim() > 3:
             x = x.squeeze(0)
+        # elif x.dim() == 3:
+        #     x = x.unsqueeze(0)
         h = x.float() #[B, n, 1024]
         h = self._fc1(h) #[B, n, 512]
-        # h = self.drop(h)
-        # h = self._fc1_1(h) #[B, n, 512]
-        # h = self._fc1_2(h) #[B, n, 512]
-        # h = self._fc2(h) #[B, n, 512]
-        # h = self._fc3(h) #[B, n, 512]
         # print('Feature Representation: ', h.shape)
         #---->duplicate pad
         H = h.shape[1]
@@ -138,7 +143,6 @@ class TransMIL(nn.Module):
         # print(h.shape)
         h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
         
-
         #---->cls_token
         B = h.shape[0]
         cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
@@ -146,8 +150,8 @@ class TransMIL(nn.Module):
 
 
         #---->Translayer x1
-        h = self.layer1(h) #[B, N, 512]
-        # h, attn1 = self.layer1(h) #[B, N, 512]
+        # h = self.layer1(h) #[B, N, 512]
+        h, attn1 = self.layer1(h) #[B, N, 512]
 
         # print('After first TransLayer: ', h.shape)
 
@@ -156,13 +160,15 @@ class TransMIL(nn.Module):
         # print('After PPEG: ', h.shape)
         
         #---->Translayer x2
-        h = self.layer2(h) #[B, N, 512]
-        # h, attn2 = self.layer2(h) #[B, N, 512]
+        # h = self.layer2(h) #[B, N, 512]
+        h, attn2 = self.layer2(h) #[B, N, 512]
+        # print('TransMIL attn2: ', attn2.shape) # attn2.shape = [1,8,512,512]
 
         # print('After second TransLayer: ', h.shape) #[1, 1025, 512] 1025 = cls_token + 1024
         #---->cls_token
         
         h = self.norm(h)[:,0]
+        # print(h.shape)
 
         #---->predict
         logits = self._fc(h) #[B, n_classes]
@@ -173,6 +179,7 @@ class TransMIL(nn.Module):
         # return logits, attn2
 
 if __name__ == "__main__":
+    
     data = torch.randn((1, 6000, 1024)).cuda()
     model = TransMIL(n_classes=2).cuda()
     print(model.eval())

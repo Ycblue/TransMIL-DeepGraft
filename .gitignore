@@ -3,3 +3,4 @@ lightning_logs/*
 test/*
 DeepGraft_Project_Plan_12.7.22.pdf
 monai_test.json
+wandb

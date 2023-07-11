@@ -1,0 +1,24 @@
+[I 2023-04-28 11:39:32.857 ServerApp] jupyterlab | extension was successfully linked.
+[I 2023-04-28 11:39:32.863 ServerApp] Writing notebook server cookie secret to /home/ylan/.local/share/jupyter/runtime/jupyter_cookie_secret
+[I 2023-04-28 11:39:33.312 ServerApp] nbclassic | extension was successfully linked.
+[I 2023-04-28 11:39:33.480 ServerApp] The port 9000 is already in use, trying another port.
+[I 2023-04-28 11:39:33.480 ServerApp] The port 9001 is already in use, trying another port.
+[I 2023-04-28 11:39:33.481 ServerApp] The port 9002 is already in use, trying another port.
+[I 2023-04-28 11:39:33.481 ServerApp] The port 9003 is already in use, trying another port.
+[I 2023-04-28 11:39:33.481 ServerApp] The port 9004 is already in use, trying another port.
+[I 2023-04-28 11:39:33.541 LabApp] JupyterLab extension loaded from /home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/jupyterlab
+[I 2023-04-28 11:39:33.541 LabApp] JupyterLab application directory is /home/ylan/miniconda3/envs/pytorch/share/jupyter/lab
+[I 2023-04-28 11:39:33.544 ServerApp] jupyterlab | extension was successfully loaded.
+[I 2023-04-28 11:39:33.608 ServerApp] nbclassic | extension was successfully loaded.
+[I 2023-04-28 11:39:33.609 ServerApp] Serving notebooks from local directory: /home/ylan/workspace/TransMIL-DeepGraft
+[I 2023-04-28 11:39:33.609 ServerApp] Jupyter Server 1.4.1 is running at:
+[I 2023-04-28 11:39:33.609 ServerApp] http://localhost:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f
+[I 2023-04-28 11:39:33.609 ServerApp]  or http://127.0.0.1:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f
+[I 2023-04-28 11:39:33.609 ServerApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 2023-04-28 11:39:33.621 ServerApp] 
+    
+    To access the server, open this file in a browser:
+        file:///home/ylan/.local/share/jupyter/runtime/jpserver-1770462-open.html
+    Or copy and paste one of these URLs:
+        http://localhost:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f
+     or http://127.0.0.1:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f

@@ -30,96 +30,98 @@ import pandas as pd
 import json
 import pprint
 
+from torchmetrics.functional.classification import binary_auroc, multiclass_auroc, binary_precision_recall_curve, multiclass_precision_recall_curve
 
-#--->Setting parameters
-def make_parse():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--stage', default='test', type=str)
-    parser.add_argument('--config', default='../DeepGraft/TransMIL.yaml',type=str)
-    parser.add_argument('--version', default=0,type=int)
-    parser.add_argument('--epoch', default='0',type=str)
-    parser.add_argument('--gpus', default = 0, type=int)
-    parser.add_argument('--loss', default = 'CrossEntropyLoss', type=str)
-    parser.add_argument('--fold', default = 0)
-    parser.add_argument('--bag_size', default = 10000, type=int)
 
-    args = parser.parse_args()
-    return args
+
+
+class InferenceModel(nn.Module):
+    def __init__(self, feature_model, mil_model):
+        super(InferenceModel, self).__init__()
+
+        self.feature_model = feature_model
+        self.mil_model = mil_model
+
+    def forward(self, x):
+
+        
+        # batch_size = x.shape[0]
+        bag_size = x.shape[0]
+        # bag = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
+        feats = self.feature_model(x).unsqueeze(0).unsqueeze(0)
+        # print(feats.shape)
+        # feats = feats.view(batch_size, bag_size, -1)
+        logits = self.mil_model(feats)
+
+        return logits
+
+
+
+
+class RETCCL_FE(pl.LightningModule):
+    def __init__(self):
+        self.model_ft = ResNet.resnet50(num_classes=128, mlp=False, two_branch=False, normlinear=True)
+        home = Path.cwd().parts[1]
+        # pre_model = 
+        # self.model_ft.fc = nn.Identity()
+        # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+        self.model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+        for param in self.model_ft.parameters():
+            param.requires_grad = False
+        self.model_ft.fc = torch.nn.Identity()
+        # self.model_ft.to(self.device)
+    
+    def forward(self, x):
+        return self.model_ft(x)
+        
+# def reshape_transform(tensor, height=14, width=14):
+#     result = tensor[:, 1 :  , :].reshape(tensor.size(0),
+#         height, width, tensor.size(2))
+
+#     # Bring the channels to the first dimension,
+#     # like in CNNs.
+#     result = result.transpose(2, 3).transpose(1, 2)
+#     return result
+
+def reshape_transform(tensor):
+    # print(tensor.shape)
+    H = tensor.shape[1]
+    _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+    add_length = _H * _W - H
+    tensor = torch.cat([tensor, tensor[:,:add_length,:]],dim = 1)
+    result = tensor[:, :, :].reshape(tensor.size(0), _H, _W, tensor.size(2))
+    result = result.transpose(2,3).transpose(1,2)
+    # print(result.shape)
+    return result
 
 class custom_test_module(ModelInterface):
-
-    # self.task = kargs['task']    
-    # self.task = 'tcmr_viral'
-
-    # def forward(self, x):
-    #     batch_size = x.shape[0]
-    #     bag_size = x.shape[1]
-    #     x = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
-    #     feats = self.model_ft(x).unsqueeze(0)
-    #     feats = feats.view(batch_size, bag_size, -1)
-    #     return self.model(feats)
-
-
 
 
     def test_step(self, batch, batch_idx):
 
-        print('custom: ', self.backbone)
-        print(self.model_ft.device)
-        
-
         torch.set_grad_enabled(True)
 
-        input, label, (wsi_name, patient) = batch
+        input, label, (wsi_name, batch_coords, patient) = batch
         
-        print(input.device)
-        # input, label, (wsi_name, batch_names, patient) = batch
-        # label = label.float()
-        # 
         # feature extraction
-        x = input
-        batch_size = x.shape[0]
-        bag_size = x.shape[1]
-        # new_shape = (batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
-        # x = x.view(new_shape)
-        x = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
-        data_ft = self.model_ft(x).unsqueeze(0)
-        data_ft = data_ft.view(batch_size, bag_size, -1)
+        # x = input
+        # batch_size = x.shape[0]
+        # bag_size = x.shape[1]
+        # x = x.view(batch_size*bag_size, x.shape[2], x.shape[3], x.shape[4])
+        # data_ft = self.test_model_ft(x).unsqueeze(0)
+        # data_ft = data_ft.view(batch_size, bag_size, -1)
 
-        logits = self.model(data_ft) 
-        Y_hat = torch.argmax(logits, dim=1)
-        Y_prob = F.softmax(logits, dim = 1)
-        # logits, Y_prob, Y_hat = self.model(data_ft) 
+        # prediction
+        logits, Y_prob, Y_hat = self.step(input) 
         loss = self.loss(logits, label)
-
-        # input_data, label, (wsi_name, batch_names, patient) = batch
-        # patient = patient[0]
-        # wsi_name = wsi_name[0]
-        # label = label.float()
-        # # logits, Y_prob, Y_hat = self.step(data) 
-        # # print(data.shape)
-        # input_data = input_data.squeeze(0).float()
-        # # print(self.model_ft)
-        # # print(self.model)
-        # logits, _ = self(input_data)
-        # # attn = attn.detach()
-        # # logits = logits.detach()
-
-        # Y = torch.argmax(label)
-        # Y_hat = torch.argmax(logits, dim=1)
-        # Y_prob = F.softmax(logits, dim=1)
-
-        
-
-        # print('Y_hat:', Y_hat)
-        # print('Y_prob:', Y_prob)
 
         
         #----> Get GradCam maps, map each instance to attention value, assemble, overlay on original WSI 
         if self.model_name == 'TransMIL':
+            print(self.model.layer2.norm)
             target_layers = [self.model.layer2.norm] # 32x32
             # target_layers = [self.model_ft[0].features[-1]] # 32x32
-            self.cam = GradCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform) #, reshape_transform=self.reshape_transform
+            self.cam = GradCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=reshape_transform) #, reshape_transform=self.reshape_transform
             # self.cam_ft = GradCAM(model=self.model, target_layers = target_layers_ft, use_cuda=True) #, reshape_transform=self.reshape_transform
         elif self.model_name == 'TransformerMIL':
             target_layers = [self.model.layer1.norm]
@@ -139,16 +141,22 @@ class custom_test_module(ModelInterface):
         target = [ClassifierOutputTarget(Y)]
         # print(target)
         
-        grayscale_cam = self.cam(input_tensor=data_ft, targets=target, eigen_smooth=True)
+        
+        print(input)
+        input.requires_grad=True
+        grayscale_cam = self.cam(input_tensor=input, targets=target, eigen_smooth=True)
         grayscale_cam = torch.Tensor(grayscale_cam)[:instance_count, :] #.to(self.device)
 
         #----------------------------------------------------
         # Get Topk Tiles and Topk Patients
         #----------------------------------------------------
         k = 10
-        summed = torch.mean(grayscale_cam, dim=2)
-        topk_tiles, topk_indices = torch.topk(summed.squeeze(0), k, dim=0)
-        topk_data = input[topk_indices].detach()
+        # summed = torch.mean(grayscale_cam, dim=2)
+        if self.n_classes == 2:
+            topk_tiles, topk_indices = torch.topk(logits[:, 1], k, dim=0)
+        # topk_tiles, topk_indices = torch.topk(summed.squeeze(0), k, dim=0)
+        topk_coords = batch_coords[topk_indices]
+        # topk_data = input[topk_indices].detach()
         # print(topk_tiles)
         
         #----------------------------------------------------
@@ -168,7 +176,7 @@ class custom_test_module(ModelInterface):
         # self.save_attention_map(wsi_name, batch_names, grayscale_cam, target=Y)
         # print('test_step_patient: ', patient)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y, 'name': wsi_name, 'patient': patient, 'topk_data': topk_data} #
+        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : Y, 'name': wsi_name, 'patient': patient, 'topk_coords': topk_coords} #
         # return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': name} #, 'topk_data': topk_data
 
     def test_epoch_end(self, output_results):
@@ -186,7 +194,9 @@ class custom_test_module(ModelInterface):
         slide_names = [x['name'] for x in output_results]
         patients = [x['patient'] for x in output_results]
         loss = torch.stack([x['loss'] for x in output_results])
+        topk_coords = torch.cat([x['topk_coords'] for x in output_results])
         #---->
+        print(topk_coords)
 
         self.log_dict(self.test_metrics(max_probs.squeeze(), target.squeeze()),
                           on_epoch = True, logger = True, sync_dist=True)
@@ -355,37 +365,78 @@ class custom_test_module(ModelInterface):
 
     def save_attention_map(self, wsi_name, batch_names, grayscale_cam, target):
 
-        # def get_coords(batch_names): #ToDO: Change function for precise coords
-        #     coords = []
-            
-        #     for tile_name in batch_names: 
-        #         pos = re.findall(r'\((.*?)\)', tile_name[0])
-        #         x, y = pos[-1].split('_')
-        #         coords.append((int(x),int(y)))
-        #     return coords
+    # def get_coords(batch_names): #ToDO: Change function for precise coords
+    #     coords = []
+        
+    #     for tile_name in batch_names: 
+    #         # print(tile_name)
+    #         pos = re.findall(r'\((.*?)\)', tile_name)
+    #         # print(pos)
+    #         x, y = pos[-1].split('-')
+    #         # print(x, y)
+    #         coords.append((int(x),int(y)))
+
+    #     return coords
+
+        def get_coords(batch_names):
+            coords = []
+            batch_names = batch_names.squeeze(0)
+            for i in range(batch_names.shape[0]): 
+                c = batch_names[i, :]
+                # print(c)
+                x = c[0]
+                y = c[1]
+                coords.append((int(x),int(y)))
+            return coords
 
         home = Path.cwd().parts[1]
         jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides/BLOCKS'
+        save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/img/')
 
-        coords = batch_names.squeeze()
+        coords = get_coords(batch_names)
         data = []
-        for co in coords:
 
-            tile_path =  Path(jpg_dir) / wsi_name / f'{wsi_name}_({co[0]}_{co[1]}).jpg'
-            img = np.asarray(Image.open(tile_path)).astype(np.uint8)
-            img = torch.from_numpy(img)
-            # print(img.shape)
-            data.append(img)
-        # coords_set = set(coords)
-        # data = data.unsqueeze(0)
-        # print(data.shape)
-        data = torch.stack(data)
-        # print(data.max())
-        # print(data.min())
-        # print(coords)
-        # temp_data = data.cpu()
-        # print(data.shape)
-        wsi = self.assemble(data, coords).cpu().numpy()
+        position_dict = {}
+        assembled = []
+        # for tile in self.predictions:
+        count = 0
+        white_value = 0
+        x_max = max([x[0] for x in coords])
+        y_max = max([x[1] for x in coords])
+
+        for i, (x,y) in enumerate(coords):
+            if x not in position_dict.keys():
+
+                position_dict[x] = [(y, i)]
+            else: position_dict[x].append((y, i))
+
+        test_img_compl = torch.ones([(y_max+1)*224, (x_max+1)*224, 3])
+        for i in range(x_max+1):
+            if i in position_dict.keys():
+                for j in position_dict[i]:
+                    
+                    # sample_idx = j[1]
+                    # print(coords[j[1]])
+                    co = coords[j[1]]
+                    tile_path =  Path(jpg_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
+                    img = np.asarray(Image.open(tile_path)).astype(np.uint8)
+                    img = img / 255.0
+                    img = torch.from_numpy(img)
+                    y_coord = int(j[0])
+                    x_coord = int(i)
+                    test_img_compl[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224, :] = img
+        
+        wsi = test_img_compl
+        # wsi = assemble(wsi_name, coords, device=device)
+        # print(wsi)
+        wsi_out = ((wsi-wsi.min())/(wsi.max()-wsi.min()) * 255.0).numpy().astype(np.uint8)
+        img = Image.fromarray(wsi_out)
+        img = img.convert('RGB')
+        size = (20000, 20000)
+        img.thumbnail(size, Image.Resampling.LANCZOS)
+        output_path = save_path / str(target.item())
+        output_path.mkdir(parents=True, exist_ok=True)
+        img.save(f'{output_path}/{wsi_name}.png')
         # wsi = (wsi-wsi.min())/(wsi.max()-wsi.min())
         # wsi = wsi
         # print(coords)
@@ -393,13 +444,17 @@ class custom_test_module(ModelInterface):
         #--> Get interpolated mask from GradCam
         W, H = wsi.shape[0], wsi.shape[1]
         
-        
+        # print(grayscale_cam.shape)
+        # print()
         attention_map = grayscale_cam[:, :, 1].squeeze()
-        attention_map = F.relu(attention_map)
-        # print(attention_map)
+        # attention_map = F.relu(attention_map)
+        # print('Attention_map')
+        # print(attention_map.shape)
+        # print(attention_map.device)
         input_h = 224
         
-        mask = torch.ones(( int(W/input_h), int(H/input_h))).to(self.device)
+        mask = torch.ones(( int(W/input_h), int(H/input_h)))
+        # print(mask.device)
         # print('mask.shape: ', mask.shape)
         # print('attention_map.shape: ', attention_map.shape)
         for i, (x,y) in enumerate(coords):
@@ -411,34 +466,36 @@ class custom_test_module(ModelInterface):
         mask = mask.squeeze(0).permute(1,2,0)
 
         mask = (mask - mask.min())/(mask.max()-mask.min())
-        mask = mask.cpu().numpy()
-        
-        def show_cam_on_image(img, mask):
-            heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
-            heatmap = np.float32(heatmap) / 255
-            cam = heatmap*0.4 + np.float32(img)
-            cam = cam / np.max(cam)
-            return cam
+        mask = mask.numpy()
 
-        wsi_cam = show_cam_on_image(wsi, mask)
+        # print('mask: ', mask.shape)
+        
+        # def show_cam_on_image(img, mask):
+        #     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+        #     heatmap = np.float32(heatmap) / 255
+        #     cam = heatmap*0.4 + np.float32(img)
+        #     cam = cam / np.max(cam)
+            # return cam
+
+        wsi_cam = show_cam_on_image(wsi.numpy(), mask)
         wsi_cam = ((wsi_cam-wsi_cam.min())/(wsi_cam.max()-wsi_cam.min()) * 255.0).astype(np.uint8)
         
         size = (20000, 20000)
 
-        # img = Image.fromarray(wsi_cam)
-        # img = img.convert('RGB')
-        # img.thumbnail(size, Image.ANTIALIAS)
-        # output_path = self.save_path / str(target.item())
-        # output_path.mkdir(parents=True, exist_ok=True)
-        # img.save(f'{output_path}/{wsi_name}_gradcam.jpg')
-
-        wsi = ((wsi-wsi.min())/(wsi.max()-wsi.min()) * 255.0).astype(np.uint8)
-        img = Image.fromarray(wsi)
+        img = Image.fromarray(wsi_cam)
         img = img.convert('RGB')
-        img.thumbnail(size, Image.ANTIALIAS)
-        output_path = self.save_path / str(target.item())
+        img.thumbnail(size, Image.Resampling.LANCZOS)
+        output_path = save_path / str(target.item())
         output_path.mkdir(parents=True, exist_ok=True)
-        img.save(f'{output_path}/{wsi_name}.jpg')
+        img.save(f'{output_path}/{wsi_name}_gradcam.jpg')
+
+        # wsi = ((wsi-wsi.min())/(wsi.max()-wsi.min()) * 255.0).astype(np.uint8)
+        # img = Image.fromarray(wsi)
+        # img = img.convert('RGB')
+        # img.thumbnail(size, Image.LANCZOS)
+        # output_path = save_path / str(target.item())
+        # output_path.mkdir(parents=True, exist_ok=True)
+        # img.save(f'{output_path}/{wsi_name}.jpg')
         del wsi
         del img
         del wsi_cam
@@ -515,6 +572,109 @@ class custom_test_module(ModelInterface):
         # print(img_compl)
         return test_img_compl.cpu().detach()
 
+def save_attention_map(wsi_name, batch_names, grayscale_cam, target):
+
+    def get_coords(batch_names): #ToDO: Change function for precise coords
+        coords = []
+        
+        for tile_name in batch_names: 
+            # print(tile_name)
+            pos = re.findall(r'\((.*?)\)', tile_name)
+            # print(pos)
+            x, y = pos[-1].split('-')
+            # print(x, y)
+            coords.append((int(x),int(y)))
+
+        return coords
+
+    save_path = '/home/ylan/workspace/TransMIL-DeepGraft/test/img/'
+
+    home = Path.cwd().parts[1]
+    jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides/BLOCKS'
+
+    # print(batch_names)
+    coords = get_coords(batch_names)
+    # print(wsi_name)
+    # coords = batch_names.squeeze()
+    data = []
+
+
+    for co in coords:
+        # print(jpg_dir)
+        # print(wsi_name)
+
+        tile_path =  Path(jpg_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
+        img = np.asarray(Image.open(tile_path)).astype(np.uint8)
+        img = torch.from_numpy(img)
+        # print(img.shape)
+        data.append(img)
+    # coords_set = set(coords)
+    # data = data.unsqueeze(0)
+    # print(data.shape)
+    data = torch.stack(data)
+    # print(data.max())
+    # print(data.min())
+    # print(coords)
+    # temp_data = data.cpu()
+    # print(data.shape)
+    wsi = assemble(data, coords).cpu().numpy()
+    # wsi = (wsi-wsi.min())/(wsi.max()-wsi.min())
+    # wsi = wsi
+    # print(coords)
+    # print('wsi.shape: ', wsi.shape)
+    #--> Get interpolated mask from GradCam
+    W, H = wsi.shape[0], wsi.shape[1]
+    
+    
+    attention_map = grayscale_cam[:, :, 1].squeeze()
+    attention_map = F.relu(attention_map)
+    # print(attention_map)
+    input_h = 224
+    
+    mask = torch.ones(( int(W/input_h), int(H/input_h))).to(self.device)
+    # print('mask.shape: ', mask.shape)
+    # print('attention_map.shape: ', attention_map.shape)
+    for i, (x,y) in enumerate(coords):
+        mask[y][x] = attention_map[i]
+    mask = mask.unsqueeze(0).unsqueeze(0)
+    # mask = torch.stack([mask, mask, mask]).unsqueeze(0)
+
+    mask = F.interpolate(mask, (W,H), mode='bilinear')
+    mask = mask.squeeze(0).permute(1,2,0)
+
+    mask = (mask - mask.min())/(mask.max()-mask.min())
+    mask = mask.cpu().numpy()
+    
+    def show_cam_on_image(img, mask):
+        heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+        heatmap = np.float32(heatmap) / 255
+        cam = heatmap*0.4 + np.float32(img)
+        cam = cam / np.max(cam)
+        return cam
+
+    wsi_cam = show_cam_on_image(wsi, mask)
+    wsi_cam = ((wsi_cam-wsi_cam.min())/(wsi_cam.max()-wsi_cam.min()) * 255.0).astype(np.uint8)
+    
+    size = (20000, 20000)
+
+    # img = Image.fromarray(wsi_cam)
+    # img = img.convert('RGB')
+    # img.thumbnail(size, Image.ANTIALIAS)
+    # output_path = self.save_path / str(target.item())
+    # output_path.mkdir(parents=True, exist_ok=True)
+    # img.save(f'{output_path}/{wsi_name}_gradcam.jpg')
+
+    wsi = ((wsi-wsi.min())/(wsi.max()-wsi.min()) * 255.0).astype(np.uint8)
+    img = Image.fromarray(wsi)
+    img = img.convert('RGB')
+    img.thumbnail(size, Image.ANTIALIAS)
+    output_path = save_path / str(target.item())
+    output_path.mkdir(parents=True, exist_ok=True)
+    img.save(f'{output_path}/{wsi_name}.jpg')
+    del wsi
+    del img
+    del wsi_cam
+    del mask
 
 #---->main
 def main(cfg):
@@ -544,10 +704,10 @@ def main(cfg):
         train_classic = True
         use_features = False
     if cfg.Model.backbone == 'features':
-        use_features = False
-        cfg.Model.backbone = 'retccl'
-    else: 
-        use_features = False
+        use_features = True
+    #     cfg.Model.backbone = 'retccl'
+    # else: 
+    #     use_features = False
 
     print(cfg.Model.backbone)
     # use_features = False
@@ -628,10 +788,11 @@ def main(cfg):
     for path in model_paths:
         # with open(f'{log_path}/test_metrics.txt', 'w') as f:
         #     f.write(str(path) + '\n')
-        new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
-        new_model.init_backbone()
-        new_model.save_path = Path(cfg.log_path) / 'visualization'
-        trainer.test(model=new_model, datamodule=dm)
+        # new_model = model.load_from_checkpoint(checkpoint_path=path, cfg=cfg)
+        # new_model.init_backbone()
+        # new_model.save_path = Path(cfg.log_path) / 'visualization'
+        # trainer.test(model=new_model, datamodule=dm)
+        trainer.test(model=model, datamodule=dm)
     
     # Top 5 scoring patches for patient
     # GradCam
@@ -656,6 +817,21 @@ def check_home(cfg):
         cfg.Data.label_file = '/' + str(new_path)
 
     return cfg
+
+#--->Setting parameters
+def make_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--stage', default='test', type=str)
+    parser.add_argument('--config', default='../DeepGraft/TransMIL.yaml',type=str)
+    parser.add_argument('--version', default=0,type=int)
+    parser.add_argument('--epoch', default='0',type=str)
+    parser.add_argument('--gpus', default = 0, type=int)
+    parser.add_argument('--loss', default = 'CrossEntropyLoss', type=str)
+    parser.add_argument('--fold', default = 0)
+    parser.add_argument('--bag_size', default = 10000, type=int)
+
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
 
@@ -689,143 +865,182 @@ if __name__ == '__main__':
     
 
     #---->main
-    # main(cfg)
-    from models import TransMIL
-    from datasets.zarr_feature_dataloader_simple import ZarrFeatureBagLoader
-    from datasets.feature_dataloader import FeatureBagLoader
-    from datasets.jpg_dataloader import JPGMILDataloader
-    from torch.utils.data import random_split, DataLoader
-    import time
-    from tqdm import tqdm
-    import torchmetrics
-    import models.ResNet as ResNet
+    main(cfg)
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(device)
-    scaler = torch.cuda.amp.GradScaler()
+    # from models import TransMIL
+    # from datasets.zarr_feature_dataloader_simple import ZarrFeatureBagLoader
+    # from datasets.feature_dataloader import FeatureBagLoader
+    # from datasets.jpg_dataloader import JPGMILDataloader
+    # from torch.utils.data import random_split, DataLoader
+    # import time
+    # from tqdm import tqdm
+    # import torchmetrics
+    # import models.ResNet as ResNet
+
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # scaler = torch.cuda.amp.GradScaler()
     
-    log_path = Path(cfg.log_path) / 'checkpoints'
-    model_paths = list(log_path.glob('*.ckpt'))
+    # log_path = Path(cfg.log_path) / 'checkpoints'
+    # model_paths = list(log_path.glob('*.ckpt'))
 
-    # print(model_paths)
-    if cfg.epoch == 'last':
-        model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
-    else:
-        model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
+    # # print(model_paths)
+    # if cfg.epoch == 'last':
+    #     model_paths = [str(model_path) for model_path in model_paths if f'last' in str(model_path)]
+    # else:
+    #     model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
 
-    # checkpoint = torch.load(f'{cfg.log_path}/checkpoints/epoch=04-val_loss=0.4243-val_auc=0.8243-val_patient_auc=0.8282244801521301.ckpt')
-    # checkpoint = torch.load(f'{cfg.log_path}/checkpoints/epoch=73-val_loss=0.8574-val_auc=0.9682-val_patient_auc=0.9724310636520386.ckpt')
-    checkpoint = torch.load(model_paths[0])
+    # # checkpoint = torch.load(f'{cfg.log_path}/checkpoints/epoch=04-val_loss=0.4243-val_auc=0.8243-val_patient_auc=0.8282244801521301.ckpt')
+    # # checkpoint = torch.load(f'{cfg.log_path}/checkpoints/epoch=73-val_loss=0.8574-val_auc=0.9682-val_patient_auc=0.9724310636520386.ckpt')
+    # # print(model_paths)
+    # checkpoint = torch.load(model_paths[0])
 
-    hyper_parameters = checkpoint['hyper_parameters']
-    n_classes = hyper_parameters['model']['n_classes']
+    # hyper_parameters = checkpoint['hyper_parameters']
+    # n_classes = hyper_parameters['model']['n_classes']
+    # # batch_size = 5
 
-    # model = TransMIL()
+    # # model = TransMIL()
 
-    model_ft = ResNet.resnet50(num_classes=128, mlp=False, two_branch=False, normlinear=True)
-    home = Path.cwd().parts[1]
-    # pre_model = 
-    # self.model_ft.fc = nn.Identity()
-    # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
-    model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
-    for param in model_ft.parameters():
-        param.requires_grad = False
-    model_ft.fc = torch.nn.Identity()
-    model_ft.to(device)
+    # model_ft = ResNet.resnet50(num_classes=128, mlp=False, two_branch=False, normlinear=True)
+    # home = Path.cwd().parts[1]
+    # # pre_model = 
+    # # self.model_ft.fc = nn.Identity()
+    # # self.model_ft.load_from_checkpoint(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth', strict=False)
+    # model_ft.load_state_dict(torch.load(f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/retccl_best_ckpt.pth'), strict=False)
+    # # for param in model_ft.parameters():
+    # #     param.requires_grad = False
+    # model_ft.fc = torch.nn.Identity()
+    # model_ft.to(device)
 
-    model = TransMIL(n_classes=n_classes, in_features=2048).to(device)
-    model_weights = checkpoint['state_dict']
+    # mil_model = TransMIL(n_classes=n_classes, in_features=2048).to(device)
+    # model_weights = checkpoint['state_dict']
 
-    for key in list(model_weights):
-        model_weights[key.replace('model.', '')] = model_weights.pop(key)
+    # for key in list(model_weights):
+    #     model_weights[key.replace('model.', '')] = model_weights.pop(key)
     
-    model.load_state_dict(model_weights)
+    # mil_model.load_state_dict(model_weights)
 
-    count = 0
-    # for m in model.modules():
-    #     if isinstance(m, torch.nn.BatchNorm2d):
-    #         # # m.track_running_stats = False
-    #         # count += 1 #skip the first BatchNorm layer in my ResNet50 based encoder
-    #         # if count >= 2:
-    #             # m.eval()
-    #         print(m)
-    #         m.track_running_stats = False
-    #         m.running_mean = None
-    #         m.running_var = None
+    # big_model = InferenceModel(model_ft, mil_model).to(device)
+    # count = 0
     
-    for param in model.parameters():
-        param.requires_grad = False
-    model.eval()
+    # # for param in big_model.parameters():
+    # #     param.requires_grad = False
+    # big_model.eval()
 
-    home = Path.cwd().parts[1]
-    data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
-    label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
-    dataset = JPGMILDataloader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes, model_name = 'TransMIL')
 
-    dl = DataLoader(dataset, batch_size=1, num_workers=8)
+    # home = Path.cwd().parts[1]
+    # data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    # label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
+    # dataset = JPGMILDataloader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes, model='TransMIL')
+
+    # dl = DataLoader(dataset, batch_size=1, num_workers=8)
+
+    # # if self.model_name == 'TransMIL':
+    #     # print(self.model.layer2.norm)
+    # # print(big_model)
+    # target_layers = [mil_model.layer2.norm] # 32x32
+    # # target_layers = [self.model_ft[0].features[-1]] # 32x32
+    # cam = GradCAM(model=big_model, target_layers = target_layers, use_cuda=True, reshape_transform=reshape_transform) #, reshape_transform=self.reshape_transform
+    #     # self.cam_ft = GradCAM(model=self.model, target_layers = target_layers_ft, use_cuda=True) #, reshape_transform=self.reshape_transform
+    # # elif self.model_name == 'TransformerMIL':
+    # #     target_layers = [self.model.layer1.norm]
+    # #     self.cam = EigenCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform)
+    # #     # self.cam = GradCAM(model=self.model, target_layers = target_layers, use_cuda=True, reshape_transform=self.reshape_transform)
+    # # else:
+    # #     target_layers = [self.model.attention_weights]
+    # #     self.cam = GradCAM(model = self.model, target_layers = target_layers, use_cuda=True)
+
+    # start = time.time()
+    # test_logits = []
+    # test_probs = []
+    # test_labels = []
+    # test_topk_data = []
+    # data = [{"count": 0, "correct": 0} for i in range(n_classes)]
+    # count = 0
+
+
+    # for item in tqdm(dl): 
+
+    #     count += 1
+    #     if count > 1:
+    #         break
+    #     bag, label, (name, batch_coords, patient) = item
+    #     batch_coords = [b[0] for b in batch_coords]
+    #     name = name[0]
+    #     # bag, label, (name, batch_coords, patient) = item
+    #     # label = label.float()
+    #     # Y = int(label)
+
+    #     bag = bag.float().to(device)
+    #     # print(bag.shape)
+    #     # bag = bag.unsqueeze(0)
+    #     with torch.cuda.amp.autocast():
+    #         bag = bag.squeeze(0)
+    #         logits = big_model(bag)
+    #     Y_hat = torch.argmax(logits, dim=1)
+    #     Y_prob = F.softmax(logits, dim = 1)
+    #     # print(logits.shape)
+    #     # print(Y_prob)
+    #     # print(bag.shape)
+    #     instance_count = bag.size(0)
+    #     # data_ft.requires_grad=True
+    #     Y = torch.argmax(label)
+    #     target = [ClassifierOutputTarget(Y)]
+    #     grayscale_cam = cam(input_tensor=bag.squeeze(), targets=target, eigen_smooth=True)
+    #     grayscale_cam = torch.Tensor(grayscale_cam)[:instance_count, :] #.to(self.device)
+
+    #     #----------------------------------------------------
+    #     # Get Topk Tiles and Topk Patients
+    #     #----------------------------------------------------
+    #     k = 10
+    #     summed = torch.mean(grayscale_cam, dim=2)
+    #     topk_tiles, topk_indices = torch.topk(summed.squeeze(0), k, dim=0)
+        
+    #     topk_data = bag[topk_indices].detach()
+        
+    #     test_topk_data.append(topk_data)
+    #     test_logits.append(logits)
+    #     test_probs.append(Y_prob)
+
+    #     test_labels.append(label)
+        
+    #     save_attention_map(name, batch_coords, grayscale_cam, target=Y)
+        
+    #     for y, y_hat in zip(label, Y_hat):
+    #         y = int(y)
+    #         # print(Y_hat)
+    #         data[y]["count"] += 1
+    #         data[y]["correct"] += (int(y_hat) == y)
+
+        
+        
+    # test_logits = torch.cat(test_logits, dim=0)
+    # probs = torch.cat(test_probs).detach().cpu()
+    # if n_classes <=2:
+    #     out_probs = probs[:,1] 
+    # else: out_probs = probs
+    # targets = torch.cat(test_labels).squeeze().detach().cpu()
+    # # print(test_logits)
+    # # print(targets)
+    # # print(test_logits.shape)
+    # # print(targets.shape)
 
     
-
-    AUROC = torchmetrics.AUROC(num_classes = n_classes)
-
-    start = time.time()
-    test_logits = []
-    test_probs = []
-    test_labels = []
-    data = [{"count": 0, "correct": 0} for i in range(n_classes)]
-
-    for item in tqdm(dl): 
-
-        bag, label, (name, batch_coords, patient) = item
-        # label = label.float()
-        Y = int(label)
-
-        bag = bag.float().to(device)
-        # print(bag.shape)
-        bag = bag.unsqueeze(0)
-        with torch.cuda.amp.autocast():
-            batch_size = bag.shape[0]
-            bag_size = bag.shape[1]
-            bag = bag.view(batch_size*bag_size, bag.shape[2], bag.shape[3], bag.shape[4])
-            feats = self.model_ft(bag).unsqueeze(0)
-            # print(feats.shape)
-            # print(x.shape)
-            # if feats.dim() == 3:
-            feats = feats.view(batch_size, bag_size, -1)
-            logits = model(feats)
-        Y_hat = torch.argmax(logits, dim=1)
-        Y_prob = F.softmax(logits, dim = 1)
-
-        # print(Y_prob)
-
-        test_logits.append(logits)
-        test_probs.append(Y_prob)
-
-        test_labels.append(label)
-        data[Y]['count'] += 1
-        data[Y]['correct'] += (int(Y_hat) == Y)
-    probs = torch.cat(test_probs).detach().cpu()
-    targets = torch.stack(test_labels).squeeze().detach().cpu()
-    print(probs.shape)
-    print(targets.shape)
-
-    
-    for c in range(n_classes):
-        count = data[c]['count']
-        correct = data[c]['correct']
-        if count == 0:
-            acc = None
-        else: 
-            acc = float(correct) / count
-        print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
+    # for c in range(n_classes):
+    #     count = data[c]['count']
+    #     correct = data[c]['correct']
+    #     if count == 0:
+    #         acc = None
+    #     else: 
+    #         acc = float(correct) / count
+    #     print('class {}: acc {}, correct {}/{}'.format(c, acc, correct, count))
 
 
 
-    auroc = AUROC(probs, targets)
-    print(auroc)
-    end = time.time()
-    print('Bag Time: ', end-start)
+    # # auroc = AUROC(probs, targets)
+    # auroc = binary_auroc(out_probs, targets)
+    # print(auroc)
+    # end = time.time()
+    # print('Bag Time: ', end-start)
 
 
 
- 

@@ -16,8 +16,10 @@ General:
 Data:
     dataset_name: custom
     data_shuffle: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128um_v2/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_limit_20_split_PAS_HE_Jones_rej_rest.json'
+    mixup: True
+    aug: True
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_rej_rest_val_1.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -34,12 +36,12 @@ Model:
     name: AttMIL
     n_classes: 2
     backbone: features
-    in_features: 1024
+    in_features: 2048
     out_features: 512
 
 
 Optimizer:
-    opt: Adam
+    opt: lookahead_radam
     lr: 0.0002
     opt_eps: null 
     opt_betas: null

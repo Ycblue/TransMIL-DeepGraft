@@ -19,14 +19,14 @@ Data:
     mixup: True
     aug: True
     cache: False
-    data_dir: '/home/ylan/data/DeepGraft/224_128uM_annotated/'
-    label_file: '/home/ylan/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_val_1.json'
+    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_rej_rest_ext.json'
     fold: 1
     nfold: 3
     cross_val: False
 
     train_dataloader:
-        batch_size: 500 
+        batch_size: 200 
         num_workers: 4
 
     test_dataloader:
@@ -43,7 +43,7 @@ Model:
 
 Optimizer:
     opt: Adam
-    lr: 0.0001
+    lr: 0.00002
     opt_eps: null 
     opt_betas: null
     momentum: null 
