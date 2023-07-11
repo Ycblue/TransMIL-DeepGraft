@@ -147,6 +147,8 @@ class ModelInterface_Classic(pl.LightningModule):
         #---->Metrics
         if self.n_classes > 2: 
             self.AUROC = torchmetrics.AUROC(task='multiclass', num_classes = self.n_classes, average=None)
+            self.accuracy = torchmetrics.Accuracy(task='multiclass', num_classes = self.n_classes, average='weighted')
+
             self.PRC = torchmetrics.PrecisionRecallCurve(task='multiclass', num_classes = self.n_classes)
             self.ROC = torchmetrics.ROC(task='multiclass', num_classes=self.n_classes)
             self.confusion_matrix = torchmetrics.ConfusionMatrix(task='multiclass', num_classes = self.n_classes) 
@@ -164,6 +166,8 @@ class ModelInterface_Classic(pl.LightningModule):
                                                                             
         else : 
             self.AUROC = torchmetrics.AUROC(task='binary')
+            self.accuracy = torchmetrics.Accuracy(task='binary')
+
             # self.AUROC = torchmetrics.AUROC(num_classes=self.n_classes, average = 'weighted')
             self.PRC = torchmetrics.PrecisionRecallCurve(task='binary')
             self.ROC = torchmetrics.ROC(task='binary')
@@ -298,6 +302,10 @@ class ModelInterface_Classic(pl.LightningModule):
                 nn.Linear(53*53, self.out_features),
                 nn.ReLU(),
             )
+        
+        self.train_step_outputs = []
+        self.validation_step_outputs = []
+        self.test_step_outputs = []
 
     # def __build_
 
@@ -350,14 +358,15 @@ class ModelInterface_Classic(pl.LightningModule):
 
         self.log('loss', loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
 
-        return {'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': label} 
+        self.train_step_outputs.append({'loss': loss, 'Y_prob': Y_prob, 'Y_hat': Y_hat, 'label': label})
+        return loss
 
-    def training_epoch_end(self, training_step_outputs):
+    def on_training_epoch_end(self):
 
         # logits = torch.cat([x['logits'] for x in training_step_outputs], dim = 0)
-        probs = torch.cat([x['Y_prob'] for x in training_step_outputs])
-        max_probs = torch.cat([x['Y_hat'] for x in training_step_outputs])
-        target = torch.cat([x['label'] for x in training_step_outputs])
+        probs = torch.cat([x['Y_prob'] for x in self.train_step_outputs])
+        max_probs = torch.cat([x['Y_hat'] for x in self.train_step_outputs])
+        target = torch.cat([x['label'] for x in self.train_step_outputs])
 
         # probs = torch.cat([x['Y_prob'] for x in training_step_outputs])
         # probs = torch.stack([x['Y_prob'] for x in training_step_outputs], dim=0)
@@ -415,28 +424,29 @@ class ModelInterface_Classic(pl.LightningModule):
         # print(Y_hat)
         # print(label)
         # self.log('val_aucm_loss', aucm_loss, prog_bar=True, on_epoch=True, logger=True, batch_size=1, sync_dist=True)
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient, 'tile_name': tile_name, 'loss': loss}
-
-
-    def validation_epoch_end(self, val_step_outputs):
+        self.validation_step_outputs.append({'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient, 'tile_name': tile_name, 'loss': loss})
         
-        logits = torch.cat([x['logits'] for x in val_step_outputs], dim = 0)
-        probs = torch.cat([x['Y_prob'] for x in val_step_outputs])
-        max_probs = torch.cat([x['Y_hat'] for x in val_step_outputs])
-        target = torch.cat([x['label'] for x in val_step_outputs])
+
+
+    def on_validation_epoch_end(self):
+        
+        logits = torch.cat([x['logits'] for x in self.validation_step_outputs], dim = 0)
+        probs = torch.cat([x['Y_prob'] for x in self.validation_step_outputs])
+        max_probs = torch.cat([x['Y_hat'] for x in self.validation_step_outputs])
+        target = torch.cat([x['label'] for x in self.validation_step_outputs])
         # slide_names = [list(x['name']) for x in val_step_outputs]
         slide_names = []
-        for x in val_step_outputs:
+        for x in self.validation_step_outputs:
             slide_names += list(x['name'])
         # patients = [list(x['patient']) for x in val_step_outputs]
         patients = []
-        for x in val_step_outputs:
+        for x in self.validation_step_outputs:
             patients += list(x['patient'])
         tile_name = []
-        for x in val_step_outputs:
+        for x in self.validation_step_outputs:
             tile_name += list(x['tile_name'])
 
-        loss = torch.stack([x['loss'] for x in val_step_outputs])
+        loss = torch.stack([x['loss'] for x in self.validation_step_outputs])
 
         self.log_dict(self.valid_metrics(max_probs.squeeze(), target.squeeze()),
                           on_epoch = True, logger = True, sync_dist=True)
@@ -444,6 +454,8 @@ class ModelInterface_Classic(pl.LightningModule):
         if self.n_classes <=2:
             out_probs = probs[:,1] 
         else: out_probs = probs
+
+        self.log('val_accuracy', self.accuracy(out_probs, target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
         self.log_confusion_matrix(out_probs, target, stage='val', comment='slide')
         if len(target.unique()) != 1:
@@ -505,6 +517,7 @@ class ModelInterface_Classic(pl.LightningModule):
         self.log_pr_curve(patient_score, patient_target.squeeze(), stage='val', comment='patient')
 
         
+        
         if len(patient_target.unique()) != 1:
             self.log('val_patient_auc', self.AUROC(patient_score, patient_target.squeeze()).mean(), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         else:    
@@ -516,8 +529,7 @@ class ModelInterface_Classic(pl.LightningModule):
             
 
         # precision, recall, thresholds = self.PRC(probs, target)
-
-        
+        # self.log('val_accuracy', self.accuracy(patient_score, patient_target), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
 
         #---->acc log
         for c in range(self.n_classes):
@@ -557,19 +569,19 @@ class ModelInterface_Classic(pl.LightningModule):
         # self.data[Y]["correct"] += (int(Y_hat) == Y)
         # self.data[Y]["correct"] += (Y_hat.item() == Y)
 
-        return {'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient, 'tile_name': batch_names}
+        self.test_step_outputs.append({'logits' : logits, 'Y_prob' : Y_prob, 'Y_hat' : Y_hat, 'label' : label, 'name': wsi_name, 'patient': patient, 'tile_name': batch_names})
 
-    def test_epoch_end(self, output_results):
+    def on_test_epoch_end(self):
 
-        logits = torch.cat([x['logits'] for x in output_results], dim = 0)
-        probs = torch.cat([x['Y_prob'] for x in output_results])
-        max_probs = torch.cat([x['Y_hat'] for x in output_results])
-        target = torch.cat([x['label'] for x in output_results])
+        logits = torch.cat([x['logits'] for x in self.test_step_outputs], dim = 0)
+        probs = torch.cat([x['Y_prob'] for x in self.test_step_outputs])
+        max_probs = torch.cat([x['Y_hat'] for x in self.test_step_outputs])
+        target = torch.cat([x['label'] for x in self.test_step_outputs])
         slide_names = []
-        for x in output_results:
+        for x in self.test_step_outputs:
             slide_names += list(x['name'])
         patients = []
-        for x in output_results:
+        for x in self.test_step_outputs:
             patients += list(x['patient'])
         tile_name = []
         # for x in output_results:
@@ -892,8 +904,8 @@ class ModelInterface_Classic(pl.LightningModule):
             
         else:
             confmat = confusion_matrix(probs, target, task='multiclass', num_classes=self.n_classes)
-        print(stage, comment)
-        print(confmat)
+        # print(stage, comment)
+        # print(confmat)
         cm_labels = LABEL_MAP[self.task].values()
 
         fig, ax = plt.subplots()

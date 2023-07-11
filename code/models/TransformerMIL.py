@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from nystrom_attention import NystromAttention
+from collections import OrderedDict
+from ._transformer import PreNorm, Attention, FeedForward
+from einops import repeat
 
 try:
     import apex
@@ -11,6 +14,22 @@ except ModuleNotFoundError:
     # Error handling
     apex_available = False
     pass
+
+class Transformer(nn.Module):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
+            ]))
+
+    def forward(self, x): #, register_hook=False
+        for attn, ff in self.layers:
+            x = attn(x) + x # , register_hook=register_hook
+            x = ff(x) + x
+        return x
 
 class TransLayer(nn.Module):
 
@@ -57,119 +76,131 @@ class TransformerMIL(nn.Module):
         super(TransformerMIL, self).__init__()
         # in_features = 2048
         # out_features = 512
+        
+
         self.pos_layer_0 = PPEG(dim=out_features)
-        self.pos_layer_1 = PPEG(dim=out_features)
-        self.pos_layer_2 = PPEG(dim=out_features)
-        self.pos_layer_3 = PPEG(dim=out_features)
-        self.pos_layer_4 = PPEG(dim=out_features)
-        self.pos_layer_5 = PPEG(dim=out_features)
+        # self.pos_layer_1 = PPEG(dim=out_features)
+        # self.pos_layer_2 = PPEG(dim=out_features)
+        # self.pos_layer_3 = PPEG(dim=out_features)
+        # self.pos_layer_4 = PPEG(dim=out_features)
+        # self.pos_layer_5 = PPEG(dim=out_features)
         if apex_available: 
             norm_layer = apex.normalization.FusedLayerNorm
         else:
             norm_layer = nn.LayerNorm
+
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_features, int(in_features/2), kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(int(in_features/2)),
+            nn.GELU(),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(int(in_features/2), out_features, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_features),
+            nn.GELU(),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        )
+
         if in_features == 2048:
-            self._fc1 = nn.Sequential(
+            self.fc1 = nn.Sequential(
                 nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
                 nn.Linear(int(in_features/2), out_features), nn.GELU(),
-                ) 
+                )
         elif in_features == 1024:
-            self._fc1 = nn.Sequential(
+            self.fc1 = nn.Sequential(
                 # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
                 nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
                 ) 
+        elif in_features == 768:
+            self.fc1 = nn.Sequential(nn.Linear(in_features, 512, bias=True), nn.ReLU())
+        elif in_features == 384:
+            self.fc1 = nn.Sequential(nn.Linear(in_features, 512, bias=True), nn.ReLU())
         # self._fc1 = nn.Sequential(nn.Linear(1024, 512), nn.ReLU())
         self.cls_token = nn.Parameter(torch.randn(1, 1, out_features))
+        
         self.n_classes = n_classes
         self.layer1 = TransLayer(dim=out_features)
         self.layer2 = TransLayer(dim=out_features)
-        self.layer3 = TransLayer(dim=out_features)
-        self.layer4 = TransLayer(dim=out_features)
-        self.layer5 = TransLayer(dim=out_features)
-        self.layer6 = TransLayer(dim=out_features)
-        self.layer7 = TransLayer(dim=out_features)
-        self.layer8 = TransLayer(dim=out_features)
-        self.layer9 = TransLayer(dim=out_features)
-        self.layer10 = TransLayer(dim=out_features)
-        self.layer11 = TransLayer(dim=out_features)
-        self.layer12 = TransLayer(dim=out_features)
-        # self.layer4 = TransLayer(dim=out_features)
         self.norm = nn.LayerNorm(out_features)
         self._fc2 = nn.Linear(out_features, self.n_classes)
 
+        dropout=0.5
+        emb_dropout=0.5
+        pool='cls'
+        self.transformer1 = Transformer(dim=out_features, depth=2, dim_head=64, heads=8, mlp_dim=512, dropout=dropout)
+        self.transformer2 = Transformer(dim=out_features, depth=2, dim_head=64, heads=8, mlp_dim=512, dropout=dropout)
+        self.dropout = nn.Dropout(emb_dropout)
+        self.to_latent = nn.Identity()
+        self.pool = pool
 
-    def forward(self, x): #, **kwargs
-
-        h = x.squeeze(0).float() #[B, n, 1024]
-        h = self._fc1(h) #[B, n, 512]
+    def forward(self, x):    
         
-        # print('Feature Representation: ', h.shape)
-        #---->duplicate pad
-        H = h.shape[1]
-        _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
-        add_length = _H * _W - H
-        h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
+        # print(x.shape)
+        x = x.squeeze(0)
+        # print(x.shape)
+        b, n, d = x.shape
+        x = self.fc1(x)
+        cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = self.dropout(x)
+        x = self.transformer1(x)
+        x = self.transformer2(x)
+        x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
+        x = self.to_latent(x)
+        x = self.norm(x)
+        return self._fc2(x)
+
+
+    # def forward(self, x): #, **kwargs
+
+    #     x = x.squeeze(0)
+    #     x = self.conv1(x)
+    #     h = self.conv2(x)
+
+    #     h = h.view(h.shape[0], h.shape[2]*h.shape[2], h.shape[1]) #shape convolution output to list of vectors
+    #     H = h.shape[1]
+    #     _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+    #     add_length = _H * _W - H
+    #     h = torch.cat([h, h[:,:add_length,:]],dim = 1) #[B, N, 512]
         
+    #     # #---->cls_token
+    #     B = h.shape[0] #batch_size
+    #     cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
+    #     h = torch.cat((cls_tokens, h), dim=1)
 
-        #---->cls_token
-        B = h.shape[0]
-        cls_tokens = self.cls_token.expand(B, -1, -1).cuda()
-        h = torch.cat((cls_tokens, h), dim=1)
 
-
-        #---->Translayer x1
-        h, _ = self.layer1(h) #[B, N, 512]
-        h = self.pos_layer_0(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer2(h) #[B, N, 512]
-        h = self.pos_layer_1(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer4(h) #[B, N, 512]
-        h = self.pos_layer_2(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer5(h) #[B, N, 512]
-        h = self.pos_layer_3(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer6(h) #[B, N, 512]
-        h = self.pos_layer_4(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer7(h) #[B, N, 512]
-        h = self.pos_layer_5(h, _H, _W) #[B, N, 512]
-        h, _ = self.layer8(h) #[B, N, 512]
-        h, _ = self.layer9(h) #[B, N, 512]
-        # h, _ = self.layer10(h) #[B, N, 512]
-        # h, _ = self.layer11(h) #[B, N, 512]
-        # h, _ = self.layer12(h) #[B, N, 512]
-
-        # print('After first TransLayer: ', h.shape)
-
-        #---->PPEG
-        # h = self.pos_layer(h, _H, _W) #[B, N, 512]
-        # # print('After PPEG: ', h.shape)
+    #     # #---->Translayer x1
+    #     h, _ = self.layer1(h) #[B, N, 512]
+    #     h = self.pos_layer_0(h, _H, _W) #[B, N, 512]
+    #     h, _ = self.layer2(h) #[B, N, 512]
         
-        # #---->Translayer x2
-        # h, attn2 = self.layer2(h) #[B, N, 512]
+    #     h = self.norm(h)[:,0]
 
-        # print('After second TransLayer: ', h.shape) #[1, 1025, 512] 1025 = cls_token + 1024
-        #---->cls_token
-        
-        h = self.norm(h)[:,0]
-
-        #---->predict
-        logits = self._fc2(h) #[B, n_classes]
-        # return logits, attn2
-        return logits
+    #     #---->predict
+    #     logits = self._fc2(h) #[B, n_classes]
+    #     # return logits, attn2
+    #     return logits
 
 if __name__ == "__main__":
-    data = torch.randn((1, 6000, 512)).cuda()
-    model = TransMIL(n_classes=2).cuda()
-    print(model.eval())
-    logits, attn = model(data)
-    cls_attention = attn[:,:, 0, :6000]
-    values, indices = torch.max(cls_attention, 1)
-    mean = values.mean()
-    zeros = torch.zeros(values.shape).cuda()
-    filtered = torch.where(values > mean, values, zeros)
+    data = torch.randn((1, 5, 2048, 50, 50)).cuda()
+    model = TransformerMIL(n_classes=2, in_features=2048, out_features=512).cuda()
+    model.eval()
+    # print(model.eval())
+    # logits, attn = model(data)
+    # cls_attention = attn[:,:, 0, :6000]
+    # values, indices = torch.max(cls_attention, 1)
+    # mean = values.mean()
+    # zeros = torch.zeros(values.shape).cuda()
+    # filtered = torch.where(values > mean, values, zeros)
     
     # filter = values > values.mean()
     # filtered_values = values[filter]
     # values = np.where(values>values.mean(), values, 0)
+    output = model(data)
+    print(output.shape)
 
-    print(filtered.shape)
+    # print(filtered.shape)
 
 
     # values = [v if v > values.mean().item() else 0 for v in values]

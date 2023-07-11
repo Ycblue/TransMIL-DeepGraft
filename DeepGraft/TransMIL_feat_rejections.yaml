@@ -18,9 +18,9 @@ Data:
     data_shuffle: False
     mixup: True
     aug: True
-    cache: False
+    cache: True
     data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
-    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_rejections_mixin_1.json'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_rejections.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -42,7 +42,7 @@ Model:
 
 
 Optimizer:
-    opt: lookahead_radam
+    opt: radam
     lr: 0.002
     opt_eps: null 
     opt_betas: null

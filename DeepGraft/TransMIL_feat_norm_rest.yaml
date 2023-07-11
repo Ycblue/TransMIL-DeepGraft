@@ -9,24 +9,27 @@ General:
     epochs: &epoch 1000 
     grad_acc: 2
     frozen_bn: False
-    patience: 50
+    patience: 100
     server: train #train #test
     log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
+    feature_extractor: retccl
     data_shuffle: False
-    mixup: True
+    mixup: False
     aug: True
-    cache: False
-    data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
+    cache: True
+    bag_size: 200
+    # data_dir: '/homeStor1/ylan/data/DeepGraft/224_1024uM_annotated/'
+    data_dir: '/homeStor1/ylan/data/DeepGraft/512_256uM_annotated/'
     label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rest_ext.json'
     fold: 1
     nfold: 3
     cross_val: False
 
     train_dataloader:
-        batch_size: 50
+        batch_size: 64
         num_workers: 4
 
     test_dataloader:
@@ -37,8 +40,8 @@ Model:
     name: TransMIL
     n_classes: 2
     backbone: features
-    in_features: 768
-    out_features: 512
+    # in_features: 384
+    # out_features: 384
 
 
 Optimizer:

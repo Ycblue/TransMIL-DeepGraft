@@ -20,7 +20,7 @@ Data:
     aug: True
     cache: False
     data_dir: '/home/ylan/data/DeepGraft/224_256uM_annotated/'
-    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_val_1.json'
+    label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rest_ext.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -42,7 +42,7 @@ Model:
 
 
 Optimizer:
-    opt: lookahead_radam
+    opt: radam
     lr: 0.001
     opt_eps: null 
     opt_betas: null

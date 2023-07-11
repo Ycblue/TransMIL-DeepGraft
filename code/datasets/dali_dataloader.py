@@ -1,12 +1,12 @@
-import nvidia.dali as dali
-from nvidia.dali import pipeline_def
+# import nvidia.dali as dali
+# from nvidia.dali import pipeline_def
 from nvidia.dali.pipeline import Pipeline
 import nvidia.dali.fn as fn
 # import nvidia.dali.fn.readers.file as file
 from nvidia.dali.fn.decoders import image, image_random_crop
 
 import nvidia.dali.types as types
-from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy
+from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy, DALIGenericIterator
 
 from pathlib import Path
 import json
@@ -41,7 +41,7 @@ class ExternalInputIterator(object):
         self.empty_slides = []
 
         home = Path.cwd().parts[1]
-        slide_patient_dict_path = f'/{home}/ylan/DeepGraft/training_tables/slide_patient_dict.json'
+        slide_patient_dict_path = f'/homeStor1/ylan/data/DeepGraft/training_tables/slide_patient_dict.json'
         with open(slide_patient_dict_path, 'r') as f:
             self.slidePatientDict = json.load(f)
 
@@ -77,8 +77,8 @@ class ExternalInputIterator(object):
 
         self.n = len(self.files)
 
-        test_data_root = os.environ['DALI_EXTRA_PATH']
-        jpeg_file = os.path.join(test_data_root, 'db', 'single', 'jpeg', '510', 'ship-1083562_640.jpg')
+        # test_data_root = os.environ['DALI_EXTRA_PATH']
+        # jpeg_file = os.path.join(test_data_root, 'db', 'single', 'jpeg', '510', 'ship-1083562_640.jpg')
 
     def __iter__(self):
         self.i = 0
@@ -216,21 +216,40 @@ def ExternalSourcePipeline(batch_size, num_threads, device_id, external_data):
 
 # training_dataloader = DALIClassificationIterator(pipelines=training_pipeline, reader_name='Reader', last_batch_policy=LastBatchPolicy.PARTIAL, auto_reset=True)
 # validation_pipeline = DALIClassificationIterator(pipelines=validation_pipeline, reader_name='Reader', last_batch_policy=LastBatchPolicy.PARTIAL, auto_reset=True)
+@pipeline_def(num_threads=4, device_id=self.trainer.local.rank)
+def get_dali_pipeline(images_dir):
+    images, _ = fn.readers.file(file_root=images_dir, random_shuffle=True, name="Reader")
+    # decode data on the GPU
+    images = fn.decoders.image_random_crop(images, device="mixed", output_type=types.RGB)
+    # the rest of processing happens on the GPU as well
+    images = fn.resize(images, resize_x=256, resize_y=256)
+    images = fn.crop_mirror_normalize(
+        images,
+        crop_h=224,
+        crop_w=224,
+        mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+        std=[0.229 * 255, 0.224 * 255, 0.225 * 255],
+        mirror=fn.random.coin_flip(),
+    )
+    return images
 
 if __name__ == '__main__':
 
     home = Path.cwd().parts[1]
-    file_path = f'/{home}/ylan/data/DeepGraft/224_128um_v2'
-    label_path = f'/{home}/ylan/DeepGraft/training_tables/dg_limit_20_split_PAS_HE_Jones_norm_rest.json'
-    eii = ExternalInputIterator(file_path, label_path, mode="train", n_classes=2, device_id=0, num_gpus=1)
+    file_path = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_limit_20_split_PAS_HE_Jones_norm_rest.json'
 
-    pipe = ExternalSourcePipeline(batch_size=1, num_threads=2, device_id = 0,
-                              external_data = eii)
-    pii = DALIClassificationIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL)
+    train_dataloader = DALIGenericIterator([get_dali_pipeline(batch_size=16)], ['data'])
+    # eii = ExternalInputIterator(file_path, label_path, mode="train", n_classes=2, device_id=0, num_gpus=1)
 
-    for e in range(3):
-        for i, data in enumerate(pii):
-            # print(data)
-            print("epoch: {}, iter {}, real batch size: {}".format(e, i, len(data[0]["data"])))
-        pii.reset()
+    # pipe = ExternalSourcePipeline(batch_size=1, num_threads=2, device_id = 0,
+    #                         external_data = eii)
+    # pii = DALIClassificationIterator(pipe, last_batch_padded=True, last_batch_policy=LastBatchPolicy.PARTIAL)
+
+    # for e in range(3):
+    #     for i, data in enumerate(pii):
+    #         # print(data)
+    #         print("epoch: {}, iter {}, real batch size: {}".format(e, i, len(data[0]["data"])))
+    #     pii.reset()
+
             

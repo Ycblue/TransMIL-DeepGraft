@@ -3,7 +3,7 @@ General:
     seed: 2021
     fp16: True
     amp_level: O2
-    precision: 16 
+    precision: 16-mixed 
     multi_gpu_mode: dp
     gpus: [0]
     epochs: &epoch 1000 
@@ -26,7 +26,7 @@ Data:
     cross_val: False
 
     train_dataloader:
-        batch_size: 25
+        batch_size: 128
         num_workers: 4
 
     test_dataloader:
@@ -37,7 +37,7 @@ Model:
     name: TransformerMIL
     n_classes: 2
     backbone: features
-    in_features: 2048
+    in_features: 768
     out_features: 512
 
 

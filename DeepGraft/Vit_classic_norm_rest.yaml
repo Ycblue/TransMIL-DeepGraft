@@ -3,7 +3,7 @@ General:
     seed: 2021
     fp16: True
     amp_level: O2
-    precision: 16
+    precision: 16-mixed
     multi_gpu_mode: ddp
     gpus: [0, 1]
     epochs: &epoch 500 
@@ -16,6 +16,7 @@ General:
 Data:
     dataset_name: custom
     data_shuffle: False
+    feature_extractor: None
     mixup: True
     aug: True
     cache: False
@@ -26,7 +27,7 @@ Data:
     cross_val: False
 
     train_dataloader:
-        batch_size: 200 
+        batch_size: 3000 
         num_workers: 4
 
     test_dataloader:

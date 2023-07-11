@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from nystrom_attention import NystromAttention
-import models.ResNet as ResNet
-from pathlib import Path
+# import models.ResNet as ResNet
+# from pathlib import Path
 
 try:
     import apex
@@ -21,10 +21,12 @@ class TransLayer(nn.Module):
     def __init__(self, norm_layer=nn.LayerNorm, dim=512):
         super().__init__()
         self.norm = norm_layer(dim)
+
+        attention_heads = 8 #8
         self.attn = NystromAttention(
             dim = dim,
-            dim_head = dim//8,
-            heads = 8,
+            dim_head = dim//attention_heads, #dim//8
+            heads = attention_heads,
             num_landmarks = dim//2,    # number of landmarks
             pinv_iterations = 6,    # number of moore-penrose iterations for approximating pinverse. 6 was recommended by the paper
             residual = True,         # whether to do an extra residual with the value or not. supposedly faster convergence if turned on
@@ -81,18 +83,32 @@ class TransMIL(nn.Module):
 
         if in_features == 2048:
             self._fc1 = nn.Sequential(
+                # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
+                # nn.Linear(int(in_features/2), int(in_features/4)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/4)),
+                # nn.Linear(int(in_features/4), out_features), nn.GELU(),
                 nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
+                # nn.Linear(int(in_features/2), int(in_features/4)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/4)),
                 nn.Linear(int(in_features/2), out_features), nn.GELU(),
                 ) 
+            
+            # self._fc1 = nn.Sequential(
+            #     nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(int(in_features/2)),
+            #     nn.Linear(int(in_features/2), out_features), nn.GELU(),
+            #     ) 
         elif in_features == 1024:
             self._fc1 = nn.Sequential(
-                # nn.Linear(in_features, int(in_features/2)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
+                nn.Linear(in_features, int(in_features)), nn.GELU(), nn.Dropout(p=0.2), norm_layer(out_features),
                 nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
                 ) 
         elif in_features == 768:
             self._fc1 = nn.Sequential(
                 nn.Linear(in_features, int(in_features)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(in_features),
                 nn.Linear(in_features, out_features), nn.GELU(), nn.Dropout(p=0.6), norm_layer(out_features)
+                ) 
+        elif in_features == 384:
+            self._fc1 = nn.Sequential(
+                # nn.Linear(in_features, int(in_features)), nn.GELU(), nn.Dropout(p=0.6), norm_layer(in_features),
+                nn.Linear(in_features, out_features), nn.GELU(),
                 ) 
         # out_features = 256 
         # self._fc1 = nn.Sequential(
@@ -122,11 +138,11 @@ class TransMIL(nn.Module):
         # self.model_ft.fc = nn.Linear(2048, self.in_features)
 
 
-    def forward(self, x): #, **kwargs
+    def forward(self, x, return_attn=False): #, **kwargs
 
         # x = self.model_ft(x).unsqueeze(0)
         # print(x.shape)
-        # x = x.unsqueeze(0) # needed for feature extractorVisualization!!!
+        # x = x.unsqueeze(0) # needed for feature extractor Visualization!!!
         # print(x.shape)
         if x.dim() > 3:
             x = x.squeeze(0)
@@ -137,7 +153,9 @@ class TransMIL(nn.Module):
         # print('Feature Representation: ', h.shape)
         #---->duplicate pad
         H = h.shape[1]
+        # print(h.size[1])    
         _H, _W = int(np.ceil(np.sqrt(H))), int(np.ceil(np.sqrt(H)))
+        # _H, _W =   H.sqrt().ceil().int(), H.sqrt().ceil().int(),
         add_length = _H * _W - H
 
         # print(h.shape)
@@ -166,7 +184,7 @@ class TransMIL(nn.Module):
 
         # print('After second TransLayer: ', h.shape) #[1, 1025, 512] 1025 = cls_token + 1024
         #---->cls_token
-        
+        # hh = self.norm(h)
         h = self.norm(h)[:,0]
         # print(h.shape)
 
@@ -175,15 +193,17 @@ class TransMIL(nn.Module):
         # Y_hat = torch.argmax(logits, dim=1)
         # Y_prob = F.softmax(logits, dim = 1)
         # results_dict = {'logits': logits, 'Y_prob': Y_prob, 'Y_hat': Y_hat}
-        return logits
-        # return logits, attn2
+        # return logits
+        if return_attn:
+            return logits, attn2
+        else: return logits
 
 if __name__ == "__main__":
     
     data = torch.randn((1, 6000, 1024)).cuda()
-    model = TransMIL(n_classes=2).cuda()
-    print(model.eval())
-    logits, attn = model(data)
+    model = TransMIL(in_features=1024, n_classes=2).cuda()
+    # print(model.eval())
+    logits, attn = model(data, return_attn=True)
     cls_attention = attn[:,:, 0, :6000]
     values, indices = torch.max(cls_attention, 1)
     mean = values.mean()
@@ -195,6 +215,7 @@ if __name__ == "__main__":
     # values = np.where(values>values.mean(), values, 0)
 
     print(filtered.shape)
+    print(filtered)
 
 
     # values = [v if v > values.mean().item() else 0 for v in values]

@@ -104,13 +104,30 @@ class ModelInterface(pl.LightningModule):
         super(ModelInterface, self).__init__()
         self.save_hyperparameters() #ignore=kargs.keys()
         self.n_classes = model.n_classes
+        self.lr = optimizer.lr
+        # if 'in_features' in kargs.keys():
+        #     self.in_features = kargs['in_features']
+        # else: self.in_features = 2048
+        # print(self.in_features)
+        # print(model.in_features)
+        self.in_features = model.in_features
+        # self.bag_size = int(kargs['bag_size'])
+        if 'bag_size' in kargs.keys():
+            self.bag_size = int(kargs['bag_size'])
+        else: self.bag_size = 200
         
         if model.name == 'AttTrans':
             self.model = milmodel.MILModel(num_classes=self.n_classes, pretrained=True, mil_mode='att_trans')
         elif model.name == 'vit':
             self.model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=self.n_classes)
             self.model.patch_embed = nn.Sequential(nn.Linear(self.in_features, 768), nn.Identity())
-
+        elif model.name == 'resnet50':
+            self.model = models.resnet50(weights='IMAGENET1K_V1')
+            self.model.conv1 = torch.nn.Conv2d(self.in_features, 64, kernel_size=(7,7), stride=(2,2), padding=(3,3))
+            # print(self.model)
+            self.model.fc = torch.nn.Sequential(
+                torch.nn.Linear(self.model.fc.in_features, self.n_classes),
+            )
         else: self.load_model()
         if self.n_classes>2:
             # self.aucm_loss = AUCM_MultiLabel(num_classes = self.n_classes, device=self.device)
@@ -124,14 +141,11 @@ class ModelInterface(pl.LightningModule):
 
         self.model_name = model.name
         
-        
         self.optimizer = optimizer
         # print(kargs)
         self.save_path = kargs['log']
 
-        if 'in_features' in kargs.keys():
-            self.in_features = kargs['in_features']
-        else: self.in_features = 2048
+        
         # # self.out_features = kargs['out_features']
         # self.in_features = 2048
         self.out_features = 512
@@ -230,8 +244,9 @@ class ModelInterface(pl.LightningModule):
         elif self.backbone == 'resnet50':
             
             self.model_ft = resnet50_baseline(pretrained=True)
-            for param in self.model_ft.parameters():
-                param.requires_grad = False
+            # self.model_ft.fc = torch.linear()
+            # for param in self.model_ft.parameters():
+            #     param.requires_grad = False
 
             
         elif self.backbone == 'efficientnet':
@@ -256,17 +271,22 @@ class ModelInterface(pl.LightningModule):
                 nn.Linear(53*53*50, 1024),
                 nn.ReLU(),
             )
+
+        # print('Bag_size: ', self.bag_size)
         if self.model_ft:
-            self.example_input_array = torch.rand([1,1000,3,224,224])
+            self.example_input_array = torch.rand([1,self.bag_size,3,224,224])
+        elif self.model_name == 'resnet50' or self.model_name == 'CTMIL':
+            self.example_input_array = torch.rand([5,self.in_features,50,50])
+        
         else:
-            self.example_input_array = torch.rand([1,1000,self.in_features])
+            self.example_input_array = torch.rand([1,self.bag_size,self.in_features])
+        # self.example_input_array = torch.rand([1,self.bag_size,self.in_features])
 
         self.train_step_outputs = []
         self.validation_step_outputs = []
         self.test_step_outputs = []
 
     def forward(self, x):
-        # print(x.shape)
         if self.model_name == 'AttTrans' or self.model_name == 'MonaiMILModel':
             return self.model(x)
         if self.model_ft:
@@ -283,17 +303,18 @@ class ModelInterface(pl.LightningModule):
         else: 
             feats = x.unsqueeze(0)
         del x
+        if self.model_name == 'resnet50':
+            feats = feats.squeeze(0)
         return self.model(feats)
         # return self.model(x)
 
     def step(self, input):
 
-        
         input = input.float()
         logits = self(input.contiguous())
         Y_hat = torch.argmax(logits, dim=1)
-        # Y_prob = F.softmax(logits, dim = 1)
-        Y_prob = torch.sigmoid(logits)
+        Y_prob = F.softmax(logits, dim = 1)
+        # Y_prob = torch.sigmoid(logits)
 
 
         # Y_hat = torch.argmax(logits, dim=1)
@@ -303,7 +324,10 @@ class ModelInterface(pl.LightningModule):
 
     def training_step(self, batch):
 
-        input, label, _= batch
+        # print()
+        # print(batch)
+        # print(len(batch))
+        input, label, _ = batch
 
 
         logits, Y_prob, Y_hat = self.step(input) 
@@ -453,14 +477,18 @@ class ModelInterface(pl.LightningModule):
         patients = [item for sublist in patients for item in sublist]
         loss = torch.stack([x['loss'] for x in self.validation_step_outputs])
         
-        self.log_dict(self.val_metrics(max_probs.squeeze(), target.squeeze()),
-                          on_epoch = True, logger = True, sync_dist=True)
+        # if len(max_probs.shape) <2:
+        #     max_probs = max_probs.unsqueeze(0).unsqueeze(0)
+        #     target = target.unsqueeze(0).unsqueeze(0)
+        
+        # self.log_dict(self.val_metrics(max_probs.squeeze(0), target.squeeze(0)),
+        #                   on_epoch = True, logger = True, sync_dist=True)
 
         if self.n_classes <=2:
             out_probs = probs[:,1] 
         else: out_probs = probs
 
-        self.log_confusion_matrix(out_probs, target, stage='val', comment='slide')
+        # self.log_confusion_matrix(out_probs, target, stage='val', comment='slide')
         if len(target.unique()) != 1:
             self.log('val_auc', self.AUROC(out_probs, target.squeeze()).mean(), prog_bar=True, on_epoch=True, logger=True, sync_dist=True)
         else:    
@@ -529,13 +557,15 @@ class ModelInterface(pl.LightningModule):
         if self.n_classes <=2:
             patient_score = patient_score[:,1] 
 
-        self.log_confusion_matrix(patient_score, patient_target, stage='val', comment='patient')
+        # self.log_confusion_matrix(patient_score, patient_target, stage='val', comment='patient')
         
         # print(patient_score)
         # print(patient_target)
         # print(patient_target.squeeze())
         # print(self.AUROC(patient_score, patient_target.squeeze()))
         
+        # print('patient_score: ', patient_score)
+        # print('patient_target: ', patient_target)
         
 
         # self.log_roc_curve(patient_score, patient_target.squeeze(), stage='val', comment='patient')
@@ -684,14 +714,30 @@ class ModelInterface(pl.LightningModule):
                 score.append(probs)
             
             score = torch.stack(score)
+            # print(score)
             if self.n_classes <= 2:
                 positive_positions = (score.argmax(dim=1) == 1).nonzero().squeeze()
                 if positive_positions.numel() != 0:
                     score = score[positive_positions]
+            # elif self.n_classes > 2: 
+            #     positive_positions = (score.argmax(dim=1) > 0).nonzero().squeeze()
+            #     if positive_positions.numel() == 1:
+            #         score = score[positive_positions]
+            #     else: 
+
+            #         values, indices = score[positive_positions].max(dim=1)
+            #         values = values.squeeze().argmax()
+            #         score = score[positive_positions[]]
+            # positive_positions = (score.argmax(dim=1) > 0).nonzero().squeeze()
+            # if positive_positions.numel() != 0:
+            #     score = score[positive_positions]
+
                 
             if len(score.shape) > 1:
                 
+                # print('before: ', score)
                 score = torch.mean(score, dim=0) #.cpu().detach().numpy()
+                # print('after: ', score)
 
             patient_score.append(score)  
             
@@ -748,8 +794,8 @@ class ModelInterface(pl.LightningModule):
         self.log_confusion_matrix(patient_score, patient_target, stage='test', comment='patient')
         # log roc curve
 
-        print(patient_score.shape)
-        print(patient_target.shape)
+        # print(patient_score.shape)
+        # print(patient_target.shape)
         self.log_roc_curve(patient_score, patient_target.squeeze(), stage='test', comment='patient')
         # log pr curve
         self.log_pr_curve(patient_score, patient_target.squeeze(), stage='test')
@@ -854,7 +900,7 @@ class ModelInterface(pl.LightningModule):
     
         for v in label_mapping.values():
             slide_output_dict[v] = []
-        print(slide_output_dict)
+        # print(slide_output_dict)
         for p, t in zip(list(complete_patient_dict.keys()), patient_target):
             # print(complete_patient_dict[p])
             # target_label = label_mapping[str(t.item())]?
@@ -906,6 +952,7 @@ class ModelInterface(pl.LightningModule):
             optimal_threshold [Float]
         '''
 
+
         youden_j = tpr - fpr
         optimal_idx = torch.argmax(youden_j)
         # print(youden_j[optimal_idx])
@@ -916,7 +963,7 @@ class ModelInterface(pl.LightningModule):
 
         return optimal_fpr, optimal_tpr, optimal_threshold
 
-    def log_topk_patients(self, patient_list, patient_scores, patient_target, thresh=[], stage='val',  k=10):
+    def log_topk_patients(self, patient_list, patient_scores, patient_target, thresh=[], stage='val',  k=5):
         
         # patient_target = np.array([i.item() for i in patient_target])
         patient_target = torch.Tensor(patient_target)
@@ -927,11 +974,9 @@ class ModelInterface(pl.LightningModule):
 
         for n in range(self.n_classes):
 
-            # print(n)
-
             n_patients = patient_list[patient_target == n]
             n_scores = [s[n] for s in patient_scores[patient_target == n]]
-            print(n_patients)
+            # print(n_patients)
 
             topk_csv_path = f'{self.loggers[0].log_dir}/{stage}_c{n}_top_patients.csv'
 
@@ -950,8 +995,10 @@ class ModelInterface(pl.LightningModule):
 
     def load_thresholds(self, probs, target, stage, comment=''):
         threshold_csv_path = f'{self.loggers[0].log_dir}/val_thresholds.csv'
+        optimal_threshold = 1/self.n_classes
         if not Path(threshold_csv_path).is_file():
-            thresh_df = pd.DataFrame({'slide': [0.5], 'patient': [0.5]})
+            
+            thresh_df = pd.DataFrame({'slide': [optimal_threshold], 'patient': [optimal_threshold]})
             thresh_df.to_csv(threshold_csv_path, index=False)
 
         thresh_df = pd.read_csv(threshold_csv_path)
@@ -960,12 +1007,13 @@ class ModelInterface(pl.LightningModule):
                 fpr_list, tpr_list, thresholds = self.ROC(probs, target)
                 optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
                 print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
-                thresh_df.at[0, comment] =  optimal_threshold
-                thresh_df.to_csv(threshold_csv_path, index=False)
+                
             else: 
-                optimal_threshold = 0.5
+                optimal_threshold = 1/self.n_classes
+            # thresh_df.at[0, comment] =  optimal_threshold
+            # thresh_df.to_csv(threshold_csv_path, index=False)
+
         elif stage == 'test': 
-            
             optimal_threshold = thresh_df.at[0, comment]
             print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
 
@@ -979,6 +1027,9 @@ class ModelInterface(pl.LightningModule):
 
         # read threshold file
         threshold_csv_path = f'{self.loggers[0].log_dir}/val_thresholds.csv'
+        # print(self.loggers[0].log_dir)
+        # print(threshold_csv_path)
+        
         if not Path(threshold_csv_path).is_file():
             # thresh_dict = {'index': ['train', 'val'], 'columns': , 'data': [[0.5, 0.5], [0.5, 0.5]]}
             thresh_df = pd.DataFrame({'slide': [0.5], 'patient': [0.5]})
@@ -993,7 +1044,10 @@ class ModelInterface(pl.LightningModule):
                 thresh_df.at[0, comment] =  optimal_threshold
                 thresh_df.to_csv(threshold_csv_path, index=False)
             else: 
-                optimal_threshold = 0.5
+                # fpr_list, tpr_list, thresholds = multiclass_roc(probs, target)
+                # optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
+
+                optimal_threshold = 1/self.n_classes
         elif stage == 'test': 
             
             optimal_threshold = thresh_df.at[0, comment]

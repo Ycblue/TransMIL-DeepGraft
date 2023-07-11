@@ -16,6 +16,7 @@ from .jpg_dataloader import JPGMILDataloader
 from .classic_jpg_dataloader import JPGBagLoader
 from .zarr_feature_dataloader_simple import ZarrFeatureBagLoader
 from .feature_dataloader import FeatureBagLoader
+from .local_feature_dataloader import LocalFeatureBagLoader
 from pathlib import Path
 # from transformers import AutoFeatureExtractor
 from torchsampler import ImbalancedDatasetSampler
@@ -124,7 +125,7 @@ import torch
 
 class MILDataModule(pl.LightningDataModule):
 
-    def __init__(self, data_root: str, label_path: str, model_name: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, use_features=False, train_classic=False, mixup=False, aug=False, fine_tune=False, *args, **kwargs):
+    def __init__(self, data_root: str, label_path: str, model_name: str, batch_size: int=1, num_workers: int=8, n_classes=2, cache: bool=True, use_features=False, train_classic=False, mixup=False, aug=False, fine_tune=False, bag_size=500, *args, **kwargs):
         super().__init__()
         self.data_root = data_root
         self.label_path = label_path
@@ -142,11 +143,15 @@ class MILDataModule(pl.LightningDataModule):
         self.aug = aug
         self.train_classic = train_classic
         self.fine_tune = fine_tune
-        self.max_bag_size = 1000
+        self.max_bag_size = bag_size
         self.model_name = model_name
         self.use_features = use_features
+        self.in_features = kwargs['in_features']
+        self.feature_extractor = kwargs['feature_extractor']
+        # if self.feature_
+        # elif self.feature_extractor == 'histoencoder':
+        self.fe_name = f'FEATURES_{self.feature_extractor.upper()}_{self.in_features}'
 
-        
 
         self.class_weight = []
         self.cache = cache
@@ -159,23 +164,25 @@ class MILDataModule(pl.LightningDataModule):
         else: 
             self.base_dataloader = FeatureBagLoader
             # self.cache = True
-
-
+        if model_name == 'resnet50' or model_name == 'CTMIL':
+            self.base_dataloader = LocalFeatureBagLoader
 
     def setup(self, stage: Optional[str] = None) -> None:
         home = Path.cwd().parts[1]
         # print('batch size: ', self.batch_size)
         # print('valid_data')
-        self.valid_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='val', n_classes=self.n_classes, cache=self.cache, model=self.model_name)
+        
+        self.valid_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='val', n_classes=self.n_classes, cache=self.cache, model=self.model_name, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
         if stage in (None, 'fit'):
             # print('self.fine_tune', self.fine_tune)
             if self.fine_tune:
-                self.train_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='fine_tune', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug, model=self.model_name)
+                self.train_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='fine_tune', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug, model=self.model_name, feature_extractor=self.fe_name, max_bag_size=self.max_bag_size) #, max_bag_size=self.max_bag_size
             else:
-                self.train_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug, model=self.model_name)
+                self.train_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes, cache=self.cache, mixup=self.mixup, aug=self.aug, model=self.model_name, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
             # self.valid_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='val', n_classes=self.n_classes, cache=self.cache, model=self.model_name)
 
             # dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
+            # print(self.base_dataloader)
             print('Train Data: ', len(self.train_data))
             # print('Val Data: ', len(self.valid_data))
             # a = int(len(dataset)* 0.8)
@@ -188,7 +195,7 @@ class MILDataModule(pl.LightningDataModule):
 
         if stage in (None, 'test'):
             
-            self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False, model=self.model_name, mixup=False, aug=False)
+            self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False, model=self.model_name, mixup=False, aug=False, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
 
         return super().setup(stage=stage)
 
@@ -200,19 +207,44 @@ class MILDataModule(pl.LightningDataModule):
         if self.train_classic or not self.use_features:
             return DataLoader(self.train_data, batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         else:
-            return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
+            return DataLoader(self.train_data,  batch_size = self.batch_size, sampler=ImbalancedDatasetSampler(self.train_data), num_workers=self.num_workers, collate_fn=self.simple_collate) #batch_transforms=self.transform, pseudo_batch_dim=True, 
             # return DataLoader(self.train_data,  batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data)
     def val_dataloader(self) -> DataLoader:
         if self.train_classic:
             return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
         else:
-            return DataLoader(self.valid_data, batch_size = 1, num_workers=self.num_workers)
+            return DataLoader(self.valid_data, batch_size = 1, sampler=ImbalancedDatasetSampler(self.valid_data), num_workers=self.num_workers)
     
     def test_dataloader(self) -> DataLoader:
         if self.train_classic:
             return DataLoader(self.test_data, batch_size = self.batch_size, num_workers=self.num_workers)
         else: return DataLoader(self.test_data, batch_size = 1, num_workers=self.num_workers)
+
+    def simple_collate(self, data):
+        # print(data[0])
+        bags = [i[0] for i in data]
+        labels = [i[1] for i in data]
+        name = [i[2][0] for i in data]
+        patient = [i[2][1] for i in data]
+        bags = torch.stack(bags)
+        labels = torch.Tensor(np.stack(labels, axis=0)).long()
+        return bags, labels, (name, patient)
+
+    def custom_collate_fn(self, batch):
+        # out_batch = [i for i in batch]
+        # for i in range(len(batch)):
+        # x = torch.stack(list(batch))
+
+        out_batch = [i[0] for i in batch]
+        labels = [i[1] for i in batch]
+        wsi_name = [i[2][0] for i in batch]
+        batch_coords = [i[2][1] for i in batch]
+        patient = [i[2][2] for i in batch]
+
+        # print(x.shape)
+        return out_batch, labels, (wsi_name, batch_coords, patient)
+            
 
     def get_weights(self, dataset):
 

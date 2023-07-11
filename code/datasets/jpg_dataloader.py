@@ -51,11 +51,10 @@ class JPGMILDataloader(data_utils.Dataset):
         # self.patients = []
         home = Path.cwd().parts[1]
 
-        self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict.json'
+        self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an_ext.json'
         # self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an.json'
         with open(self.slide_patient_dict_path, 'r') as f:
             self.slide_patient_dict = json.load(f)
-
         # if patients: 
         #     self.slides_to_process = [self.slide_patient_dict[p] for p in patients]
         # elif slides: 
@@ -71,8 +70,10 @@ class JPGMILDataloader(data_utils.Dataset):
             # print(len(temp_slide_label_dict))
 
             for (x,y) in temp_slide_label_dict:
+                
                 if self.mode == 'test':
                     x = x.replace('FEATURES_RETCCL_2048', 'TEST')
+                    
                 else:
                     x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
                 # print(x)
@@ -88,6 +89,7 @@ class JPGMILDataloader(data_utils.Dataset):
                                     self.labels += [int(y)]*len(list(x_path.glob('*')))
                                     # self.labels.append(int(y))
                                     self.files.append(x_path)
+                            
                     elif slides: 
                         if x_name in slides:
                             x_path_list = [Path(self.file_path)/x]
@@ -214,10 +216,10 @@ class JPGMILDataloader(data_utils.Dataset):
         
         for tile_path in Path(file_path).iterdir():
             img = Image.open(tile_path)
-            if self.mode == 'train':
+            # if self.mode == 'train':
         
-                # img = self.color_transforms(img)
-                img = self.train_transforms(img)
+            #     # img = self.color_transforms(img)
+            #     img = self.train_transforms(img)
             img = self.val_transforms(img)
             # img = np.asarray(Image.open(tile_path)).astype(np.uint8)
             # img = np.moveaxis(img, 2, 0)
@@ -252,6 +254,7 @@ class JPGMILDataloader(data_utils.Dataset):
         patient = self.slide_patient_dict[wsi_name]
         # except KeyError:
         #     print(f'{wsi_name} is not included in label file {self.slide_patient_dict_path}')
+        
 
         return wsi_batch, (wsi_name, coords_batch, patient)
     
@@ -259,7 +262,7 @@ class JPGMILDataloader(data_utils.Dataset):
         return [self.labels[i] for i in indices]
 
 
-    def to_fixed_size_bag(self, bag, names, bag_size: int = 512):
+    def to_fixed_size_bag(self, bag, names, bag_size: int = 250):
 
         #duplicate bag instances unitl 
 
@@ -294,7 +297,7 @@ class JPGMILDataloader(data_utils.Dataset):
         # else:
         t = self.files[index]
         # label = self.labels[index]
-        if self.mode=='train':
+        if self.mode=='train' or self.mode=='val':
 
             batch, (wsi_name, batch_coords, patient) = self.get_data(t)
             label = self.labels[index]
@@ -329,7 +332,6 @@ class JPGMILDataloader(data_utils.Dataset):
             # out_batch = torch.stack(out_batch)
             
             # ft = ft.view(-1, 512)
-            
         else:
             batch, (wsi_name, batch_coords, patient) = self.get_data(t)
             label = self.labels[index]

@@ -74,9 +74,13 @@ class Visualize():
 
         home = Path.cwd().parts[1]
 
+        # self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/DEEPGRAFT_RU/BLOCKS'
+        # self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/DEEPGRAFT_RU/ROI'
+        # self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_features/')
         self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/BLOCKS'
         self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/ROI'
         self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_features/')
+        # self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/results_test/mil_model_features/')
         
 
         self.checkpoint = torch.load(checkpoint_path)
@@ -172,8 +176,6 @@ class Visualize():
             y = c[1]
             coords.append((int(x),int(y)))
 
-        
-
         for i, (x,y) in enumerate(coords):
             if x not in position_dict.keys():
                 position_dict[x] = [(y, i)]
@@ -199,6 +201,8 @@ class Visualize():
             tpk_df = pd.read_csv(tpk_csv_path)
             self.topk_dict[str(n)] = {'patients': list(tpk_df.head(5)['Patient']), 'labels': [n] * len(list(tpk_df.head(5)['Patient']))}
 
+    # def _rescale(self, ):
+
 
     def assemble(self, wsi_name, batch_coords, grayscale_cam, mil_grayscale_cam, input_h=224):
 
@@ -207,29 +211,49 @@ class Visualize():
         x_max = max([x[0] for x in coords])
         y_max = max([x[1] for x in coords])
 
-        mean_cam = torch.mean(mil_grayscale_cam, dim=2)
-        # print(mean_cam.shape)
-        # print(mean_cam.shape)
-        percentage_shown = 0.4
-        topk = int(mean_cam.shape[1] * percentage_shown) #
-        print(topk)
 
-        _, topk_indices = torch.topk(mean_cam, topk, dim=1)
-        batch_coords = torch.index_select(batch_coords.squeeze(), 0, topk_indices[0])
-        grayscale_cam = torch.index_select(grayscale_cam.squeeze(), 0, topk_indices[0])
+        mean_cam = mil_grayscale_cam[:, :, 1].squeeze()
+        # mean_cam = mil_grayscale_cam
+        # mean_cam = torch.mean(mil_grayscale_cam, dim=2)
+        mean_cam -= torch.min(mean_cam)
+        mean_cam /= torch.max(mean_cam) #normalize
+
+
+        # print(mil_grayscale_cam)
+        # print(mean_cam.shape)
+        # print(mean_cam.shape)
+        # print(mean_cam.shape)
+        percentage_shown = 0.4 #0.4 for all results
+        # topk = int(mean_cam.shape[0]) #
+        topk = int(mean_cam.shape[0] * percentage_shown) #
+        # print(topk)
+
+        _, topk_indices = torch.topk(mean_cam, topk, dim=0)
+        # print(topk_indices)
+        # print(len(topk_indices))
+        batch_coords = torch.index_select(batch_coords.squeeze(), 0, topk_indices)
+        grayscale_cam = torch.index_select(grayscale_cam.squeeze(), 0, topk_indices)
+        # print(mean_cam.shape)
+        # print(grayscale_cam.shape)
+        # print(mean_cam[0])
+        # print(grayscale_cam[0, :, :])
+        # grayscale_cam = mean_cam@grayscale_cam
 
         feature_cam = torch.zeros([(y_max+1)*224, (x_max+1)*224])
-        # print('batch_coords:', batch_coords.shape)
+        print('batch_coords:', batch_coords.shape)
         # print(coords.shape)
+        # for i,( c, img, w) in enumerate(zip(batch_coords.squeeze(0), grayscale_cam, mean_cam)):
         for i,( c, img) in enumerate(zip(batch_coords.squeeze(0), grayscale_cam)):
             c = c.squeeze()
+            
             x = c[0].item()
             y = c[1].item()
             # print(x, y)
             
             # print(img.shape)
             # if i in topk_indices:
-            feature_cam[y*224:y*224+224, x*224:x*224+224] = img 
+            # feature_cam[y*224:y*224+224, x*224:x*224+224] = img * w
+            feature_cam[y*224:y*224+224, x*224:x*224+224] = img
         # feature_cam = (feature_cam - feature_cam.min())/(feature_cam.max()-feature_cam.min())
         wsi = torch.ones([(y_max+1)*224, (x_max+1)*224, 3])
         roi = np.zeros([(y_max+1)*224, (x_max+1)*224])
@@ -253,8 +277,6 @@ class Visualize():
                     img_cam = Image.fromarray(tile_cam)
                     img_cam = img_cam.convert('RGB')
                     img_cam.save(f'{self.output_path}/tiles/{wsi_name}/{wsi_name}_({co[0]}-{co[1]})_gradcam.jpg')
-
-
 
                     roi_path =  Path(self.roi_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
                     img = np.asarray(Image.open(roi_path)).astype(np.uint8)
@@ -362,7 +384,7 @@ class Visualize():
         print('Save GradCAM overlay.')
         img = Image.fromarray(wsi_cam)
         img = img.convert('RGB')
-        img.save(f'{self.output_path}/{wsi_name}_gradcam.jpg')
+        img.save(f'{self.output_path}/{wsi_name}_mil_gradcam.jpg')
 
 
     def run(self, target_label):
@@ -388,12 +410,14 @@ class Visualize():
         # print(slides)
         self.output_path = self.output_path / str(target_label)
         self.output_path.mkdir(parents=True, exist_ok=True)
+        # print(self.output_path)
         slides_done = [x.stem.rsplit('_', 1)[0] for x in list(self.output_path.iterdir()) if Path(x).suffix == '.jpg']
-        slides_done += ['29.61s/it]Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_007_PAS']
+        print(slides_done)
+        # slides_done += ['Aachen_KiBiDatabase_KiBiAcOSNX750_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcOSNX750_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcOSNX750_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_014_PAS']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcSVXX412_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_008_Jones']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_007_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcFLGQ191_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcFLGQ191_01_004_PAS', 'Aachen_KiBiDatabase_KiBiAcFLGQ191_01_008_Jones', ]
-        # slides_done += ['Aachen_KiBiDatabase_KiBiAcLAXK110_01_007_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS']
+        slides_done += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS'] #, 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS']
         slides = [s for s in slides if s not in slides_done]
 
         try:
@@ -418,6 +442,8 @@ class Visualize():
 
         c = 0
         for item in tqdm(dl):
+            # if c >10:
+            #     break
 
             bag, label, (name, batch_coords, patient) = item
             
@@ -426,64 +452,61 @@ class Visualize():
 
             slide_name = name[0]
             print(slide_name)
+            print(bag.shape)
             # if slide_name != 'Aachen_KiBiDatabase_KiBiAcRLKM530_01_006_HE':
             # #     continue
             # # else:
             # if slide_name in self.slides_done:
             #     continue
+            # if bag.shape[1] > 200:
+                
+            #     temp = []
+            #     size_remaining = bag.shape[1]
+            #     i = 1
+            #     while size_remaining // 200 != 0:
+            #     # for i in range(bag.shape[1]//200 + 1):[[]]
+            #         sub_bag = bag[:, (i-1)*200:i*200, : , :, :].flloat().squeeze(0)
+            #         i += 1
+            #         size_remaining -= 200
+            #         temp.append(sub_bag)
+            #     else: 
+            #         sub_bag = bag[:, size_remaining%200: , : , :, :].flloat().squeeze(0)
+            #         temp.append(sub_bag)
+                
 
 
-            bag = bag.float().squeeze(0).to(self.device)
-            # features = model[0](bag.squeeze())
-            # with torch.no_grad():
-            #     features = feature_model(bag.squeeze())
-                # scores = model[1](features)
-            # print(scores)
+
+            half_size = int(bag.shape[1]/2)
+            half_bag_1 = bag[:,:half_size, :, :, :].float().squeeze(0)
+            half_bag_2 = bag[:,half_size:, :, :, :].float().squeeze(0)
+
+
+
+            # bag = bag.float().squeeze(0) #.to(self.device)
             instance_count = bag.size(0)
-            # bag = bag.detach()    
-            # features = features.detach()
-            #     
-                # with torch.cuda.amp.autocast():
-                #     pred = model(bag)
-                # print(pred.shape)
-            # target_layers = [feature_model.layer4[-1]]
-            # with GradCAM(model=feature_model, target_layers=target_layers, use_cuda=True) as cam:
-                # cam    = self._get_cam_object('Resnet50', model)
-            grayscale_cam = feature_cam(input_tensor=bag.detach(), targets=cam_target)
-            grayscale_cam = torch.Tensor(grayscale_cam)
+
+            grayscale_cam_1 = feature_cam(input_tensor=half_bag_1.detach(), targets=cam_target)
+            grayscale_cam_2 = feature_cam(input_tensor=half_bag_2.detach(), targets=cam_target)
+
+            # print(grayscale_cam_1.shape)
+            # print(grayscale_cam_2.shape)
+            grayscale_cam = torch.cat((torch.Tensor(grayscale_cam_1), torch.Tensor(grayscale_cam_2)))
+            # grayscale_cam = torch.Tensor(grayscale_cam)
+            # print(grayscale_cam.shape)
             
             with torch.no_grad():
-                features = feature_model(bag.squeeze())
-
-            
-
-
-            # mil_cam = self._get_cam_object(self.model_name, model[1])
-
-            # mil_grayscale_cam = mil_cam(input_tensor=features.unsqueeze(0), targets=cam_target)
-            # mil_grayscale_cam = torch.Tensor(mil_grayscale_cam)[:instance_count, :]
-            # target_layers = [mil_model.norm]
-            # cam = GradCAM(model=model, target_layers = target_layers, use_cuda=True, reshape_transform=self._reshape_transform)
-            # with GradCAM(model=mil_model, target_layers = target_layers, use_cuda=True, reshape_transform=self._reshape_transform) as cam:
+                features = feature_model(bag.squeeze().to(self.device))
 
             mil_grayscale_cam = mil_cam(input_tensor=features.unsqueeze(0), targets=cam_target)
             mil_grayscale_cam = torch.Tensor(mil_grayscale_cam)[:instance_count, :]
+            # mil_grayscale_cam = mil_grayscale_cam[:, :, 1].squeeze()
+
             
-            # del mil_cam
-            # del bag
-            # del features
-            # torch.cuda.empty_cache()
-            
-            # print(mil_grayscale_cam.shape)
-           
-                # print(grayscale_cam.shape)
-            
-                # # bag = bag.detach()
-                # # print(target_label)
-                # # self._save_attention_map(slide_name, batch_coords, grayscale_cam)
-                # print(grayscale_cam.max())
-                # print(grayscale_cam.min())
             self.assemble(slide_name, batch_coords, grayscale_cam, mil_grayscale_cam)
+            self._save_attention_map(slide_name, batch_coords, mil_grayscale_cam)
+
+
+            # c+= 1
 
     # for t in test_dataset:
 
@@ -545,6 +568,8 @@ if __name__ == '__main__':
 
     target_label = args.target_label
     print(task)
+    print(model_paths)
+    print(cfg.log_path)
     
     # for target_label in range(args.total_classes):
     visualizer = Visualize(checkpoint_path=model_paths[0], task=cfg.task)

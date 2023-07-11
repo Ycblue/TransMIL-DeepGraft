@@ -23,7 +23,7 @@ import h5py
 
 
 class FeatureBagLoader(data.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, model='None',cache=False, mixup=False, aug=False, mix_res=False, data_cache_size=5000, max_bag_size=1000):
+    def __init__(self, file_path, label_path, mode, n_classes, model='None',cache=False, mixup=False, aug=False, mix_res=False, data_cache_size=5000, max_bag_size=1000, **kwargs):
         super().__init__()
 
         self.data_info = []
@@ -43,11 +43,19 @@ class FeatureBagLoader(data.Dataset):
         self.empty_slides = []
         self.corrupt_slides = []
         self.cache = cache
+        # if self.mode == 'test':
+            # self.cache = False
         self.mixup = mixup
         self.aug = aug
         # self.file_path_mix = self.file_path.replace('256', '1024')
         self.missing = []
         self.use_1024 = False
+        # print(kwargs.keys())
+        if 'feature_extractor' in kwargs.keys():
+            self.feature_extractor = kwargs['feature_extractor']
+            # print('self.feature_extractor: ', self.feature_extractor)
+            # self.fe_name = f'FEATURES_{self.feature_extractor.upper()}_{self.in_features}'
+        # print(self.feature_extractor)
 
         # print('Using FeatureBagLoader: ', self.mode)
 
@@ -64,17 +72,23 @@ class FeatureBagLoader(data.Dataset):
             if self.mode == 'fine_tune':
                 temp_slide_label_dict = json_dict['train'] + json_dict['test_mixin']
             else: temp_slide_label_dict = json_dict[self.mode]
-            # print('temp_slide_label_dict:', len(temp_slide_label_dict))
+            # temp_slide_label_dict = json_dict['train']
+            # temp_slide_label_dict = json_dict['train'] + json_dict['test_mixin'] # simulate fine tuning
+            
             for (x,y) in temp_slide_label_dict:
                 
                 # test_path = Path(self.file_path)
                 # if Path(self.file_path) / 
                 # if self.mode != 'test':
+                    # x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_RETCCL_2048_HED')
                     # x = x.replace('FEATURES_RETCCL_2048', 'TEST')
                 # else:
                     # x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_RESNET50_1024_HED')
-                    # x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_RETCCL_2048_HED')
-                x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_CTRANSPATH_768')
+                #     # x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_HISTOENCODER_384')
+                
+                if self.feature_extractor:
+                    x = x.replace('FEATURES_RETCCL_2048', self.feature_extractor)
+                # x = x.replace('FEATURES_RETCCL_2048', 'FEATURES_HISTOENCODER_384')
                 # else:
                     # x = x.replace('Aachen_Biopsy_Slides', 'Aachen_Biopsy_Slides_extended')
                 x_name = Path(x).stem
@@ -293,6 +307,32 @@ class FeatureBagLoader(data.Dataset):
             wsi_name = self.wsi_names[index]
             batch_coords = self.coords[index]
             patient = self.patients[index]
+            if self.mode == 'train' or self.mode == 'fine_tune':
+                bag_size = bag.shape[0]
+
+                bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                # bag_idxs = torch.randperm(bag_size)[:int(self.max_bag_size*(1-self.drop_rate))]
+                out_bag = bag[bag_idxs, :]
+                if self.mixup:
+                    out_bag = self.get_mixup_bag(out_bag)
+                    # batch_coords = 
+                if out_bag.shape[0] < self.max_bag_size:
+                    out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
+
+                # shuffle again
+                out_bag_idxs = torch.randperm(out_bag.shape[0])
+                out_bag = out_bag[out_bag_idxs]
+
+
+                # batch_coords only useful for test
+                batch_coords = batch_coords[bag_idxs]
+                return out_bag, label, (wsi_name, patient)
+            else: 
+                
+                # bag_size = bag.shape[0]
+                # bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                # out_bag = bag[bag_idxs, :]
+                out_bag = bag
         else:
             t = self.files[index]
             label = self.labels[index]
@@ -328,6 +368,9 @@ class FeatureBagLoader(data.Dataset):
                 # if out_bag.shape[0] < self.max_bag_size:
                     # out_bag = torch.cat((out_bag, torch.zeros(self.max_bag_size-out_bag.shape[0], out_bag.shape[1])))
                     # out_batch_coords = 
+                # bag_size = bag.shape[0]
+                # bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
+                # out_bag = bag[bag_idxs, :]
                 out_bag = bag
 
             # print('feature_dataloader: ', out_bag.shape)
@@ -345,6 +388,7 @@ if __name__ == '__main__':
     import time
     # from fast_tensor_dl import FastTensorDataLoader
     from custom_resnet50 import resnet50_baseline
+    from sklearn.decomposition import PCA
     
     home = Path.cwd().parts[1]
     train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train.csv'
@@ -357,10 +401,10 @@ if __name__ == '__main__':
     # os.makedirs(output_dir, exist_ok=True)
     n_classes = 2
 
-    train_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, mixup=True, aug=True, n_classes=n_classes)
+    train_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, mixup=True, aug=True, n_classes=n_classes, max_bag_size=200)
     print('train_dataset: ', len(train_dataset))
 
-    train_dl = DataLoader(train_dataset, batch_size=100, sampler=ImbalancedDatasetSampler(train_dataset)) #
+    train_dl = DataLoader(train_dataset, batch_size=1) #
 
     print('train_dl: ', len(train_dl))
 
@@ -389,21 +433,40 @@ if __name__ == '__main__':
     
 
     # print(dataset.get_labels(np.arange(len(dataset))))
+    pca = PCA(0.95)
+    c = 0
+    label_count = [0] *n_classes
+    epochs = 1
+    # print(len(dl))
+    # start = time.time()
 
-    # c = 0
-    # label_count = [0] *n_classes
-    # epochs = 1
-    # # print(len(dl))
-    # # start = time.time()
-    # for i in range(epochs):
-    #     start = time.time()
-    #     for item in tqdm(valid_dl): 
-    #         if c >= 50:
-    #             break
-    #         # print(item)
-    #         bag, label, (name, patient) = item
-    #         c += 1
-    #     end = time.time()
-    #     print('Bag Time: ', end-start)
+    pca_tensor = []
 
-    
+    for i in range(epochs):
+        start = time.time()
+        for item in tqdm(train_dl): 
+            if c >= 1000:
+                break
+            # print(item)
+            bag, label, (name, patient) = item
+            
+            # print(bag.shape)
+            
+            # print(pca.explained_variance_ratio_)
+            # print(pca.n_components_)
+            # train_pca = pca.transform(x_train)
+            # print(x_train.shape)
+            pca_tensor.append(bag.squeeze())
+            
+            c += 1
+        end = time.time()
+        print('Bag Time: ', end-start)
+
+
+
+    pca_tensor = torch.cat(pca_tensor, dim=0)
+    print(pca_tensor.shape)
+    x_train = pca.fit_transform(pca_tensor.squeeze())
+    print(pca.n_components_)
+    print(pca.components_)
+    print(x_train.shape)

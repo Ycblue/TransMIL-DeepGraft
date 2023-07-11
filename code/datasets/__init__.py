@@ -3,3 +3,4 @@ from .jpg_dataloader import JPGMILDataloader
 from .feature_dataloader import FeatureBagLoader
 from .data_interface import MILDataModule
 from .fast_tensor_dl import FastTensorDataLoader
+from .local_feature_dataloader import LocalFeatureBagLoader

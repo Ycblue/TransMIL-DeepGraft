@@ -22,10 +22,11 @@ from .utils import myTransforms
 from transformers import ViTFeatureExtractor
 import torchvision.models as models
 import torch.nn as nn
+import random
 
 
 class JPGBagLoader(data_utils.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, model=''):
+    def __init__(self, file_path, label_path, mode, n_classes, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, model='', **kargs):
         super().__init__()
 
         self.data_info = []
@@ -75,7 +76,7 @@ class JPGBagLoader(data_utils.Dataset):
                             # self.labels.append(int(y))
                             for patch in x_path.iterdir():
                                 self.files.append((patch, x_name, y))
-
+        random.shuffle(self.files)
         # with open(self.label_path, 'r') as f:
         #     temp_slide_label_dict = json.load(f)[mode]
         #     print(len(temp_slide_label_dict))
@@ -292,11 +293,11 @@ if __name__ == '__main__':
 
     home = Path.cwd().parts[1]
     # train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train.csv'
-    data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    data_root = f'/raid/ylan/data/DeepGraft/224_256uM_annotated'
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
     # label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
-    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest.json'
+    label_path = '/homeStor1/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rest_ext.json'
     # output_dir = f'/{data_root}/debug/augments'
     # os.makedirs(output_dir, exist_ok=True)
 
@@ -325,16 +326,16 @@ if __name__ == '__main__':
     #     param.requires_grad = False
     # model_ft.to(device)
 
-    model_ft = models.resnet50(weights='IMAGENET1K_V1')
+    # model_ft = models.resnet50(weights='IMAGENET1K_V1')
 
     
-    ct = 0
-    for child in model_ft.children():
-        ct += 1
-        if ct < len(list(model_ft.children())) - 3:
-            for parameter in child.parameters():
-                parameter.requires_grad=False
-    model_ft.fc = nn.Linear(model_ft.fc.in_features, 2)
+    # ct = 0
+    # for child in model_ft.children():
+    #     ct += 1
+    #     if ct < len(list(model_ft.children())) - 3:
+    #         for parameter in child.parameters():
+    #             parameter.requires_grad=False
+    # model_ft.fc = nn.Linear(model_ft.fc.in_features, 2)
 
     # print(model_ft)
 
@@ -351,7 +352,8 @@ if __name__ == '__main__':
         if c >= 1000:
             break
         bag, label, (name, batch_names, patient) = item
-        print(bag.shape)
+        # print(bag.shape)
+        print(name)
         # print(name)
         # print(batch_names)
         # print(patient)

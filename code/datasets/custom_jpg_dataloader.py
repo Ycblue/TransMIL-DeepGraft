@@ -251,7 +251,6 @@ class JPGMILDataloader(data.Dataset):
     
     def _add_data_infos(self, file_path, cache, slide_patient_dict):
 
-        
         wsi_name = Path(file_path).stem
         if wsi_name in self.slideLabelDict:
             # if wsi_name[:2] != 'RU': #skip RU because of container problems in dataset

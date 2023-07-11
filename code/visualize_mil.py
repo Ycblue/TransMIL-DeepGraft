@@ -76,7 +76,7 @@ class Visualize():
 
         self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/TEST'
         self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/ROI'
-        self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_extended/')
+        self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_test_2/')
         
 
         self.checkpoint = torch.load(checkpoint_path)
@@ -110,6 +110,7 @@ class Visualize():
 
         # self.label_path = new_path
         self.data_root = self.hparams['data']['data_dir']
+        print(self.data_root)
 
         self.mil_model = None
         self.feat_model = None
@@ -219,9 +220,11 @@ class Visualize():
         #----------------------------------------------
         # Get mask from gradcam
         #----------------------------------------------
-        mil_attention_map = mil_grayscale_cam[:, :, 1].squeeze()
-        mil_attention_map = (mil_attention_map-mil_attention_map.min()) / (mil_attention_map.max() - mil_attention_map.min())
+        # mil_attention_map = mil_grayscale_cam[:, :, 1].squeeze()
+        mil_attention_map = mil_grayscale_cam.squeeze()
+        mil_attention_map = (mil_attention_map-mil_attention_map.min()) / (mil_attention_map.max() - mil_attention_map.min()) #normalize to 0:1
         mask = torch.zeros(( int(W/input_h), int(H/input_h)))
+        
         for i, (x,y) in enumerate(coords):
             mask[y][x] = mil_attention_map[i]
         mask = mask.unsqueeze(0).unsqueeze(0)
@@ -229,8 +232,8 @@ class Visualize():
         mask = F.interpolate(mask, (W,H), mode='bilinear')
         mask = mask.squeeze(0).permute(1,2,0)
 
-        mask = (mask - mask.min())/(mask.max()-mask.min())
-        mask = mask.numpy()
+        # mask = (mask - mask.min())/(mask.max()-mask.min()) # normalize again..?
+        mask = mask.numpy(force=True)
         # mask = gaussian_filter(mask, sigma=15)
 
         wsi_cam = show_cam_on_image(wsi.numpy(), mask, use_rgb=True, image_weight=0.6, colormap=cv2.COLORMAP_JET)
@@ -267,9 +270,9 @@ class Visualize():
         self.output_path = self.output_path / str(target_label)
         self.output_path.mkdir(parents=True, exist_ok=True)
         skip_slides = [x.stem.rsplit('_', 1)[0] for x in list(self.output_path.iterdir()) if Path(x).suffix == '.jpg']
-        skip_slides += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_006_HE']
+        # skip_slides += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_006_HE']
         slides = [s for s in slides if s not in skip_slides]
-
+        print(slides)
         try:
             len(slides) != 0
         except:
@@ -278,7 +281,10 @@ class Visualize():
         # print(slides)
 
         test_dataset = JPGMILDataloader(file_path=self.data_root, label_path=self.label_path, mode='test', cache=False, n_classes=self.n_classes, model=self.model_name, slides=slides)
+        
+        print(len(test_dataset))
         dl = DataLoader(test_dataset, batch_size=1, num_workers=4, pin_memory=True)
+        print(len(dl))
 
         for item in tqdm(dl):
             
@@ -288,24 +294,51 @@ class Visualize():
 
             slide_name = name[0]
             print(slide_name)
-            if slide_name != 'Aachen_KiBiDatabase_KiBiAcRLKM530_01_006_HE':
+            # if slide_name != 'Aachen_KiBiDatabase_KiBiAcRLKM530_01_006_HE':
             #     continue
             # else:
             
 
-                bag = bag.float().to(self.device)
-                with torch.cuda.amp.autocast():
-                    features = feature_model(bag.squeeze())
-                instance_count = bag.size(0)
-                bag = bag.detach()
-                cam_target = [ClassifierOutputTarget(target_label)]
-                
-                mil_grayscale_cam = self.cam(input_tensor=features.unsqueeze(0), targets=cam_target)
-                mil_grayscale_cam = torch.Tensor(mil_grayscale_cam)[:instance_count, :]
-                features = features.detach()
-                bag = bag.detach()
-                # print(target_label)
-                self._save_attention_map(slide_name, batch_coords, mil_grayscale_cam)
+            bag = bag.float().to(self.device)
+            # with torch.cuda.amp.autocast():
+            with torch.no_grad():
+                features = feature_model(bag.squeeze())
+
+
+
+            size = features.shape[0]
+            # print(features.shape)
+
+            x, attn = mil_model(features.unsqueeze(0), return_attn=True)
+
+            # print(attn)
+
+            # print(attn.shape)
+            cls_attention = attn[:,:, 0, :size]
+            # print(cls_attention)
+            values, indices = torch.max(cls_attention, 1)
+            mean = values.mean()
+            zeros = torch.zeros(values.shape).cuda()
+            filtered = torch.where(values > mean, values, zeros)
+
+            # print(filtered.shape)
+
+
+
+            instance_count = bag.size(0)
+            bag = bag.detach()
+            cam_target = [ClassifierOutputTarget(target_label)]
+            
+            mil_grayscale_cam = self.cam(input_tensor=features.unsqueeze(0), targets=cam_target)
+            mil_grayscale_cam = torch.Tensor(mil_grayscale_cam)[:instance_count, :]
+            mil_grayscale_cam = mil_grayscale_cam[:, :, 1].squeeze()
+
+            # print(mil_grayscale_cam.shape)
+            features = features.detach()
+            bag = bag.detach()
+            # print(target_label)
+            self._save_attention_map(slide_name, batch_coords, mil_grayscale_cam)
+            # self._save_attention_map(slide_name, batch_coords, filtered)
 
     # for t in test_dataset:
 
