@@ -11,7 +11,7 @@ General:
     frozen_bn: False
     patience: 100
     server: train #train #test
-    log_path: /home/ylan/workspace/TransMIL-DeepGraft/logs/
+    log_path: /homeStor1/ylan/workspace/TransMIL-DeepGraft/logs/
 
 Data:
     dataset_name: custom
@@ -22,8 +22,10 @@ Data:
     cache: True
     bag_size: 200
     # data_dir: '/homeStor1/ylan/data/DeepGraft/224_1024uM_annotated/'
-    data_dir: '/homeStor1/ylan/data/DeepGraft/512_256uM_annotated/'
+    # data_dir: '/homeStor1/ylan/data/DeepGraft/512_256uM_annotated/'
+    data_dir: '/raid/ylan/data/DeepGraft/224_256uM_annotated/'
     label_file: '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rest_ext.json'
+    # label_file: '/homeStor1/ylan/data/DeepGraft/training_tables/dg_limit_50_split_PAS_HE_Jones_Grocott_norm_rest.json'
     fold: 1
     nfold: 3
     cross_val: False
@@ -46,7 +48,7 @@ Model:
 
 Optimizer:
     opt: radam
-    lr: 0.002
+    lr: 0.0001
     opt_eps: null 
     opt_betas: null
     momentum: null 

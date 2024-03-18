@@ -41,6 +41,8 @@ import models.ResNet as ResNet
 
 from torchmetrics.functional.classification import binary_auroc, multiclass_auroc, binary_precision_recall_curve, multiclass_precision_recall_curve
 
+from experiment_impact_tracker.data_interface import DataInterface
+from experiment_impact_tracker.compute_tracker import ImpactTracker
 
 
 def check_home(cfg):
@@ -69,7 +71,7 @@ def check_home(cfg):
 
 class Visualize():
 
-    def __init__(self, checkpoint_path, task):
+    def __init__(self, checkpoint_path, project, task):
         super().__init__()
 
         home = Path.cwd().parts[1]
@@ -77,10 +79,20 @@ class Visualize():
         # self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/DEEPGRAFT_RU/BLOCKS'
         # self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/DEEPGRAFT_RU/ROI'
         # self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_features/')
-        self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/BLOCKS'
-        self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/ROI'
-        self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_features/')
+        if project == 'DeepGraft':
+            self.jpg_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/BLOCKS'
+            self.roi_dir = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated/Aachen_Biopsy_Slides_extended/ROI'
+            self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/mil_model_features/')
+            self.patient_slide_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/patient_slide_dict_ext.json'
+        elif project == 'RCC':
+            self.jpg_dir = f'/{home}/ylan/data/RCC/224_256uM_annotated/OurTumors/BLOCKS'
+            self.roi_dir = f'/{home}/ylan/data/RCC/224_256uM_annotated/Aachen_Biopsy_Slides_extended/ROI'
+            self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/RCC/mil_model_features/')
+            self.patient_slide_dict_path = f'/{home}/ylan/data/RCC/training_tables/patient_slide_dict_ext.json'
         # self.save_path = Path(f'/{home}/ylan/workspace/TransMIL-DeepGraft/test/results_test/mil_model_features/')
+        
+        
+        
         
 
         self.checkpoint = torch.load(checkpoint_path)
@@ -111,10 +123,17 @@ class Visualize():
             self.label_path = a + '_ext.' + b
         # print(self.label_path)
         if task == 'norm_rej_rest':
-            self.label_path = '/home/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rej_rest_ext.json'
+            self.label_path = '/homeStor1/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rej_rest_ext.json'
+        if task == 'big_three':
+            self.label_path = '/homeStor1/ylan/data/RCC/training_tables/rcc_split_HE_big_three_ext.json'
 
         # self.label_path = new_path
+        print(self.label_path)
         self.data_root = self.hparams['data']['data_dir']
+        self.data_root.replace('home', 'homeStor1')
+        self.data_root = '/homeStor1/ylan/data/RCC/224_256uM_annotated'
+        
+        print(self.data_root)
 
         self.mil_model = None
         self.feat_model = None
@@ -200,7 +219,6 @@ class Visualize():
             tpk_csv_path = Path(cfg.log_path) / f'test_epoch_{cfg.epoch}' / f'test_c{n}_top_patients.csv'
             tpk_df = pd.read_csv(tpk_csv_path)
             self.topk_dict[str(n)] = {'patients': list(tpk_df.head(5)['Patient']), 'labels': [n] * len(list(tpk_df.head(5)['Patient']))}
-
     # def _rescale(self, ):
 
 
@@ -223,14 +241,17 @@ class Visualize():
         # print(mean_cam.shape)
         # print(mean_cam.shape)
         # print(mean_cam.shape)
-        percentage_shown = 0.4 #0.4 for all results
+        percentage_shown = 1.0 #0.4 for all results
         # topk = int(mean_cam.shape[0]) #
         topk = int(mean_cam.shape[0] * percentage_shown) #
-        # print(topk)
+        print(topk)
 
         _, topk_indices = torch.topk(mean_cam, topk, dim=0)
         # print(topk_indices)
         # print(len(topk_indices))
+        # print(topk_indices)
+        # print(batch_coords.squeeze())
+        # print(len(batch_coords[0]))
         batch_coords = torch.index_select(batch_coords.squeeze(), 0, topk_indices)
         grayscale_cam = torch.index_select(grayscale_cam.squeeze(), 0, topk_indices)
         # print(mean_cam.shape)
@@ -273,16 +294,19 @@ class Visualize():
                     # save tile level gradcam
                     tile_features = feature_cam[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224]
                     mask = gaussian_filter(tile_features, sigma=15)
-                    tile_cam = show_cam_on_image(img.numpy(), tile_features, use_rgb=True, image_weight=0.6, colormap=cv2.COLORMAP_JET)
-                    img_cam = Image.fromarray(tile_cam)
-                    img_cam = img_cam.convert('RGB')
-                    img_cam.save(f'{self.output_path}/tiles/{wsi_name}/{wsi_name}_({co[0]}-{co[1]})_gradcam.jpg')
 
-                    roi_path =  Path(self.roi_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
-                    img = np.asarray(Image.open(roi_path)).astype(np.uint8)
-                    img = img / 255.0
-                    # img = torch.from_numpy(img)
-                    roi[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224] = img
+
+                    # tile_cam = show_cam_on_image(img.numpy(), tile_features, use_rgb=True, image_weight=0.6, colormap=cv2.COLORMAP_JET)
+                    # img_cam = Image.fromarray(tile_cam)
+                    # img_cam = img_cam.convert('RGB')
+                    # img_cam.save(f'{self.output_path}/tiles/{wsi_name}/{wsi_name}_({co[0]}-{co[1]})_gradcam.jpg')
+
+                    # ROI available??
+                    # roi_path =  Path(self.roi_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
+                    # img = np.asarray(Image.open(roi_path)).astype(np.uint8)
+                    # img = img / 255.0
+                    # # img = torch.from_numpy(img)
+                    # roi[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224] = img
         W, H = wsi.shape[0], wsi.shape[1]
 
         
@@ -308,13 +332,14 @@ class Visualize():
 
         # mask = (mask - mask.min())/(mask.max()-mask.min())
 
-        mask = gaussian_filter(feature_cam, sigma=15)
-        mask = (mask - mask.min())/(mask.max()-mask.min())
+        # mask = gaussian_filter(feature_cam, sigma=15)
+        # mask = (mask - mask.min())/(mask.max()-mask.min())
 
-        wsi_cam = show_cam_on_image(wsi.numpy(), mask, use_rgb=True, image_weight=0.6, colormap=cv2.COLORMAP_JET)
+        wsi_cam = show_cam_on_image(wsi.numpy(), feature_cam, use_rgb=True, image_weight=0.6, colormap=cv2.COLORMAP_JET)
 
-        roi_idx = (roi==0)
-        wsi_cam[roi_idx] = 255
+        # ROI available??
+        # roi_idx = (roi==0)
+        # wsi_cam[roi_idx] = 255
         
         size = (30000, 30000)
 
@@ -348,36 +373,47 @@ class Visualize():
                     img = torch.from_numpy(img)
                     wsi[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224, :] = img
 
-                    roi_path =  Path(self.roi_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
-                    img = np.asarray(Image.open(roi_path)).astype(np.uint8)
-                    img = img / 255.0
-                    # img = torch.from_numpy(img)
-                    roi[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224] = img
+                    #----------------------------------------------
+                    # Use ROI to filter image
+                    #----------------------------------------------
+                    # roi_path =  Path(self.roi_dir) / wsi_name / f'{wsi_name}_({co[0]}-{co[1]}).png'
+                    # img = np.asarray(Image.open(roi_path)).astype(np.uint8)
+                    # img = img / 255.0
+                    # # img = torch.from_numpy(img)
+                    # roi[y_coord*224:(y_coord+1)*224, x_coord*224:(x_coord+1)*224] = img
         W, H = wsi.shape[0], wsi.shape[1]
         #----------------------------------------------
         # Get mask from gradcam
         #----------------------------------------------
+        print('mil_grayscale_cam.shape: ', mil_grayscale_cam.shape)
         mil_attention_map = mil_grayscale_cam[:, :, 1].squeeze()
         mil_attention_map = (mil_attention_map-mil_attention_map.min()) / (mil_attention_map.max() - mil_attention_map.min())
+
         mask = torch.zeros(( int(W/input_h), int(H/input_h)))
         for i, (x,y) in enumerate(coords):
             mask[y][x] = mil_attention_map[i]
         mask = mask.unsqueeze(0).unsqueeze(0)
 
-        mask = F.interpolate(mask, (W,H), mode='bilinear')
-        mask = mask.squeeze(0).permute(1,2,0)
+        print('MASK SHAPE: ', mask.shape)
+        print(W,H)
 
-        mask = (mask - mask.min())/(mask.max()-mask.min())
+        mask = F.interpolate(mask, (W,H), mode='nearest')
+        print(mask.shape)
+        print(wsi.shape)
+        mask = mask.squeeze()
+        # mask = mask.squeeze(0).permute(1,2,0)
+
+        # mask = (mask - mask.min())/(mask.max()-mask.min())
         mask = mask.numpy()
-        mask = gaussian_filter(mask, sigma=15)
+        # mask = gaussian_filter(mask, sigma=15)
 
         wsi_cam = show_cam_on_image(wsi.numpy(), mask, use_rgb=True, image_weight=0.6)
 
         #----------------------------------------------
         # Use ROI to filter image
         #----------------------------------------------
-        roi_idx = (roi==0)
-        wsi_cam[roi_idx] = 255
+        # roi_idx = (roi==0)
+        # wsi_cam[roi_idx] = 255
         
         size = (30000, 30000)
 
@@ -389,7 +425,9 @@ class Visualize():
 
     def run(self, target_label):
 
-        patient_slide_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/patient_slide_dict_ext.json'
+
+        # patient_slide_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/patient_slide_dict_ext.json'
+
         
         self._get_topk()
         
@@ -402,23 +440,30 @@ class Visualize():
         mil_cam = self._get_cam_object(self.model_name, mil_model)
         feature_cam = self._get_cam_object('Resnet50', model)
 
-        with open(patient_slide_dict_path, 'r') as f:
+
+        with open(self.patient_slide_dict_path, 'r') as f:
             patient_slide_dict = json.load(f)
         slides = []
         for p in self.topk_dict[str(target_label)]['patients']: 
             slides += list(set(patient_slide_dict[p]))
+        
         # print(slides)
         self.output_path = self.output_path / str(target_label)
+        print(self.output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
         # print(self.output_path)
-        slides_done = [x.stem.rsplit('_', 1)[0] for x in list(self.output_path.iterdir()) if Path(x).suffix == '.jpg']
-        print(slides_done)
+        # slides_done = [x.stem.rsplit('_', 1)[0] for x in list(self.output_path.iterdir()) if Path(x).suffix == '.jpg']
+        # slides_done = ['3280_16', '5577_12']
+        # print('slides_done: ', slides_done)
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcOSNX750_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcOSNX750_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcOSNX750_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_014_PAS']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcSVXX412_01_006_HE', 'Aachen_KiBiDatabase_KiBiAcUAYM660_01_008_Jones']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_007_PAS', 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones']
         # slides_done += ['Aachen_KiBiDatabase_KiBiAcFLGQ191_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcFLGQ191_01_004_PAS', 'Aachen_KiBiDatabase_KiBiAcFLGQ191_01_008_Jones', ]
-        slides_done += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS'] #, 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS']
-        slides = [s for s in slides if s not in slides_done]
+        # slides_done += ['Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS', '17710_11'] #, 'Aachen_KiBiDatabase_KiBiAcLAXK110_01_008_Jones', 'Aachen_KiBiDatabase_KiBiAcZXRC970_01_018_PAS', 'Aachen_KiBiDatabase_KiBiAcDKIK860_01_018_PAS']
+        # slides = [s for s in slides if s not in slides_done]
+        # slides = slides[:1]
+
+        print('Slides: ', slides)
 
         try:
             len(slides) != 0
@@ -439,20 +484,38 @@ class Visualize():
         dl = DataLoader(test_dataset, batch_size=1, num_workers=4)
         cam_target = [ClassifierOutputTarget(target_label)]
 
-
+        print(len(test_dataset))
         c = 0
+
+        # tracker = ImpactTracker(f'co2log/')
+        # tracker.launch_impact_monitor()
+        bag_array = []
+
+
+        
+        repetition = 10
+        data_size = len(dl)
+        # for i in range(repetition):
         for item in tqdm(dl):
             # if c >10:
             #     break
 
             bag, label, (name, batch_coords, patient) = item
+
+            print(bag.shape)
+
+            bag_array.append(bag.shape[1])
+
             
             # label = torch.Tensor(label)
             # # idx = top_patients.index(patient[0])
+            # print(label)
+            # cam_target = [ClassifierOutputTarget(label)]
+            
 
             slide_name = name[0]
             print(slide_name)
-            print(bag.shape)
+            # print(bag.shape)
             # if slide_name != 'Aachen_KiBiDatabase_KiBiAcRLKM530_01_006_HE':
             # #     continue
             # # else:
@@ -475,40 +538,102 @@ class Visualize():
                 
 
 
-
-            half_size = int(bag.shape[1]/2)
-            half_bag_1 = bag[:,:half_size, :, :, :].float().squeeze(0)
-            half_bag_2 = bag[:,half_size:, :, :, :].float().squeeze(0)
-
-
-
-            # bag = bag.float().squeeze(0) #.to(self.device)
             instance_count = bag.size(0)
 
-            grayscale_cam_1 = feature_cam(input_tensor=half_bag_1.detach(), targets=cam_target)
-            grayscale_cam_2 = feature_cam(input_tensor=half_bag_2.detach(), targets=cam_target)
-
-            # print(grayscale_cam_1.shape)
-            # print(grayscale_cam_2.shape)
-            grayscale_cam = torch.cat((torch.Tensor(grayscale_cam_1), torch.Tensor(grayscale_cam_2)))
-            # grayscale_cam = torch.Tensor(grayscale_cam)
-            # print(grayscale_cam.shape)
+            split = 50
+            size = int(bag.shape[1]/split)
+            grayscale_cam_list = []
             
-            with torch.no_grad():
-                features = feature_model(bag.squeeze().to(self.device))
 
+
+            for i in range(split):
+                if i == split-1:
+                    # split_bag = bag[:, size*i:, :, :, :].float().squeeze(0)
+                    # with torch.no_grad():
+                        # split_feature = feature_model(split_bag.to(self.device)).detach().cpu()
+                    # grayscale_cam = feature_cam(input_tensor=bag[:, size*i:, :, :, :].float().squeeze(0).detach(), targets=cam_target)
+                    grayscale_cam_list.append(torch.Tensor(feature_cam(input_tensor=bag[:, size*i:, :, :, :].float().squeeze(0).detach(), targets=cam_target)))
+
+                else:   
+                    # split_bag = bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0)
+                    # with torch.no_grad():
+                        # split_feature = feature_model(split_bag.to(self.device)).detach().cpu()
+
+                    # grayscale_cam = feature_cam(input_tensor=bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0).detach(), targets=cam_target)
+                    grayscale_cam_list.append(torch.Tensor(feature_cam(input_tensor=bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0).detach(), targets=cam_target)))
+                # grayscale_cam_list.append(torch.Tensor(grayscale_cam))
+                # features.append(split_feature)
+                # del grayscale_cam
+            features = []
+            for i in range(split):
+                # print(i)
+                if i == split-1:
+                    split_bag = bag[:, size*i:, :, :, :].float().squeeze(0)
+                    # with torch.no_grad():
+                    #     # split_feature = feature_model(split_bag.to(self.device)).detach().cpu()
+                    #     features.append(feature_model(split_bag.to(self.device)).detach().cpu())
+
+                    # grayscale_cam = feature_cam(input_tensor=bag[:, size*i:, :, :, :].float().squeeze(0).detach(), targets=cam_target)
+                    # grayscale_cam_list.append(torch.Tensor(feature_cam(input_tensor=bag[:, size*i:, :, :, :].float().squeeze(0).detach(), targets=cam_target)))
+
+                else:   
+                    split_bag = bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0)
+                with torch.no_grad():
+                    # split_feature = feature_model(split_bag.to(self.device)).detach().cpu()
+                    features.append(feature_model(split_bag.to(self.device)).detach().cpu())
+
+
+                    # grayscale_cam = feature_cam(input_tensor=bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0).detach(), targets=cam_target)
+                    # grayscale_cam_list.append(torch.Tensor(feature_cam(input_tensor=bag[:, size*i:size*(i+1), :, :, :].float().squeeze(0).detach(), targets=cam_target)))
+                # grayscale_cam_list.append(torch.Tensor(grayscale_cam))
+                # features.append(split_feature)
+            features = torch.cat(features)
+            
             mil_grayscale_cam = mil_cam(input_tensor=features.unsqueeze(0), targets=cam_target)
             mil_grayscale_cam = torch.Tensor(mil_grayscale_cam)[:instance_count, :]
-            # mil_grayscale_cam = mil_grayscale_cam[:, :, 1].squeeze()
-
-            
+            del features
+            grayscale_cam = torch.cat(grayscale_cam_list)
+        
             self.assemble(slide_name, batch_coords, grayscale_cam, mil_grayscale_cam)
             self._save_attention_map(slide_name, batch_coords, mil_grayscale_cam)
 
 
-            # c+= 1
+        # tracker.stop()
+        # data_interface = DataInterface(['co2log'])
+        # epochs = 1
+        # bag_size = sum(bag_array) / len(bag_array)
+        # print('average bag_size: ', bag_size)
+        # print('====================')
+        # print(f'{self.model_name}')
+        # print('====================')
+        # print('kg_carbon: ', data_interface.kg_carbon)
+        # print('kg_carbon/epoch: ', data_interface.kg_carbon / epochs)
+        # print('g_carbon: ', data_interface.kg_carbon * 1000)
+        # print('g_carbon/epoch: ', data_interface.kg_carbon * 1000 / epochs)
+        # print('g_carbon/slide with 1000 patches: ', 1000*(data_interface.kg_carbon * 1000 / (data_size) / bag_size))
+        # kg_carbon = data_interface.kg_carbon / epochs
+        # print(kg_carbon)
 
-    # for t in test_dataset:
+        # '''Netherlands'''
+
+        # txt_path = f'/homeStor1/ylan/workspace/TransMIL-DeepGraft/test/co2_emission/{self.model_name}_vis.txt'
+        # # Path(txt_path).mkdir(exist_ok=True)
+        # bag_size = sum(bag_array) / len(bag_array)
+        # with open(txt_path, 'a') as f:
+        #     f.write(f'==================================================================================== \n')
+        #     f.write(f'Emissions calculated for {data_size} slides, {bag_size} patches/slide, per epoch \n')
+        #     f.write(f'{self.model_name}: {kg_carbon} [kg]\n')
+        #     f.write(f'{self.model_name}: {kg_carbon*1000} [g]\n')
+        #     f.write(f'Emissions calculated for 1 slides, {bag_size} patches/slide, per epoch \n')
+        #     f.write(f'{self.model_name}: {kg_carbon/data_size} [kg]\n')
+        #     f.write(f'{self.model_name}: {kg_carbon*1000/data_size} [g]\n')
+        #     f.write(f'==================================================================================== \n')
+
+
+
+        
+
+
 
 def make_parse():
     parser = argparse.ArgumentParser()
@@ -543,7 +668,8 @@ if __name__ == '__main__':
     cfg.version = args.version
     cfg.epoch = args.epoch
 
-    cfg = check_home(cfg)
+    # cfg = check_home(cfg)
+    print(cfg)
 
     config_path = '/'.join(Path(cfg.config).parts[1:])
     log_path = Path(cfg.General.log_path) / str(Path(config_path).parent)
@@ -554,7 +680,6 @@ if __name__ == '__main__':
     # task = Path(cfg.config).name[:-5].split('_')[2:][0]
     cfg.task = task
     cfg.log_path = log_path / f'{cfg.Model.name}' / task / log_name / 'lightning_logs' / f'version_{cfg.version}' 
-    
     home = Path.cwd().parts[1]
 
     ckpt_pth = Path(cfg.log_path) / 'checkpoints'
@@ -570,7 +695,8 @@ if __name__ == '__main__':
     print(task)
     print(model_paths)
     print(cfg.log_path)
+    cfg.project = 'RCC'
     
     # for target_label in range(args.total_classes):
-    visualizer = Visualize(checkpoint_path=model_paths[0], task=cfg.task)
+    visualizer = Visualize(checkpoint_path=model_paths[0], project=cfg.project, task=cfg.task)
     visualizer.run(target_label)

@@ -18,3 +18,1184 @@
   File "/home/ylan/miniconda3/envs/pytorch/lib/python3.9/site-packages/experiment_impact_tracker/disk/common.py", line 20, in writetofile
     f.close()
 
+2023-07-21 11:07:29,001 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-07-27 13:56:53,004 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:19:16,056 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:20:20,775 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:21:39,933 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:37:07,266 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:40:54,944 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:47:36,822 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 15:48:06,837 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception when launching power monitor thread.
+2023-09-27 16:07:24,958 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-09-27 16:07:24,985 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/lib/python3.8/subprocess.py", line 1015, in communicate
+    stdout = self.stdout.read()
+
+2023-09-27 16:07:51,295 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-09-27 16:07:51,296 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/lib/python3.8/subprocess.py", line 1015, in communicate
+    stdout = self.stdout.read()
+
+2023-11-10 15:44:41,838 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-10 15:44:41,861 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-10 15:49:49,281 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-10 15:49:49,284 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-10 15:50:55,545 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-10 15:50:55,546 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-10 15:53:07,169 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-10 15:53:07,172 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-13 17:24:22,794 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-13 17:24:23,010 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 155, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:22:18,156 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:22:18,162 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 155, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:24:58,860 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:24:58,867 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 155, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:35:52,198 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:35:52,205 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 156, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:38:39,984 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:38:39,990 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 157, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:43:21,952 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:43:21,968 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 156, in get_nvidia_gpu_power
+    print(df.groupby(["gpus", "pid"]))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/frame.py", line 8262, in groupby
+    return DataFrameGroupBy(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 931, in __init__
+    grouper, exclusions, obj = get_grouper(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/grouper.py", line 985, in get_grouper
+    raise KeyError(gpr)
+
+2023-11-14 10:44:06,159 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:44:06,167 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 157, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:46:35,231 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:46:35,237 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 157, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:49:34,447 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:49:34,453 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 158, in get_nvidia_gpu_power
+    print(df.groupby(['gpu']).mean())
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:50:49,536 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:50:49,543 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 161, in get_nvidia_gpu_power
+    print(df.groupby(['gpu']).mean())
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:51:45,022 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:51:45,026 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 166, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 10:52:50,478 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 10:52:50,481 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 166, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-14 11:11:12,709 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 11:11:12,742 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 158, in get_nvidia_gpu_power
+    df.drop(['type'], inplace=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/frame.py", line 5268, in drop
+    return super().drop(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 4549, in drop
+    obj = obj._drop_axis(labels, axis, level=level, errors=errors)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 4591, in _drop_axis
+    new_axis = axis.drop(labels, errors=errors)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/indexes/base.py", line 6696, in drop
+    raise KeyError(f"{list(labels[mask])} not found in axis")
+
+2023-11-14 11:12:12,727 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-14 11:12:12,733 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 167, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2023-11-21 12:02:55,592 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-21 12:02:55,595 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-21 12:03:56,615 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-21 12:03:56,617 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-21 12:08:22,744 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-21 12:08:22,747 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-21 12:09:15,252 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-21 12:09:15,252 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2023-11-27 10:38:36,841 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-27 10:38:36,865 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 163, in get_nvidia_gpu_power
+    outs, errors = p.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1121, in communicate
+    stdout = self.stdout.read()
+
+2023-11-27 11:00:15,009 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-27 11:00:15,039 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 127, in get_nvidia_gpu_power
+    out_str = sp.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1134, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1979, in _communicate
+    ready = selector.select(timeout)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/selectors.py", line 416, in select
+    fd_event_list = self._selector.poll(timeout)
+
+2023-11-27 14:02:22,520 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-11-27 14:02:22,544 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1121, in communicate
+    stdout = self.stdout.read()
+
+2023-12-06 16:52:27,620 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-12-06 16:52:27,653 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 127, in get_nvidia_gpu_power
+    out_str = sp.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1134, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1979, in _communicate
+    ready = selector.select(timeout)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/selectors.py", line 416, in select
+    fd_event_list = self._selector.poll(timeout)
+
+2023-12-11 17:36:56,658 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-12-11 17:36:56,946 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1121, in communicate
+    stdout = self.stdout.read()
+
+2023-12-11 23:58:15,040 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2023-12-11 23:58:15,088 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-17 14:18:55,664 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-17 14:18:55,731 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-17 15:44:53,179 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-17 15:44:53,224 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/gpu/nvidia.py", line 192, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-17 15:49:42,730 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-17 15:49:42,751 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/miniconda3/lib/python3.8/site-packages/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/lib/python3.8/subprocess.py", line 1015, in communicate
+    stdout = self.stdout.read()
+
+2024-01-17 15:50:55,818 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-17 15:50:55,821 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 199, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 21:36:36,796 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 21:36:36,799 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 199, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 21:41:42,188 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 21:41:42,190 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 199, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 21:50:01,077 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 21:50:01,078 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 199, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 21:51:37,265 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 21:51:37,266 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 199, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 22:11:34,139 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 22:11:34,141 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 200, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 22:13:17,337 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 22:13:17,338 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 201, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 22:15:35,553 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 22:15:35,555 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 204, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-18 22:31:18,514 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 22:31:18,652 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 162, in get_nvidia_gpu_power
+    process_percentage_used_gpu = df.groupby(["gpu", "pid"]).mean().reset_index()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1855, in mean
+    result = self._cython_agg_general(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1507, in _cython_agg_general
+    new_mgr = data.grouped_reduce(array_func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/managers.py", line 1503, in grouped_reduce
+    applied = sb.apply(func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/internals/blocks.py", line 329, in apply
+    result = func(self.values, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1503, in array_func
+    result = self._agg_py_fallback(values, ndim=data.ndim, alt=alt)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1457, in _agg_py_fallback
+    res_values = self.grouper.agg_series(ser, alt, preserve_dtype=True)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 994, in agg_series
+    result = self._aggregate_series_pure_python(obj, func)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/ops.py", line 1015, in _aggregate_series_pure_python
+    res = func(group)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/groupby/groupby.py", line 1857, in <lambda>
+    alt=lambda x: Series(x).mean(numeric_only=numeric_only),
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11556, in mean
+    return NDFrame.mean(self, axis, skipna, numeric_only, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11201, in mean
+    return self._stat_function(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/generic.py", line 11158, in _stat_function
+    return self._reduce(
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/series.py", line 4666, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 96, in _f
+    return f(*args, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 158, in f
+    result = alt(values, axis=axis, skipna=skipna, **kwds)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 421, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 727, in nanmean
+    the_sum = _ensure_numeric(values.sum(axis, dtype=dtype_sum))
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/site-packages/pandas/core/nanops.py", line 1699, in _ensure_numeric
+    raise TypeError(f"Could not convert {x} to numeric") from err
+
+2024-01-18 22:33:47,420 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-18 22:33:47,422 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 205, in get_nvidia_gpu_power
+    power_readings = gpu.findall("power_readings")[0]
+
+2024-01-19 10:12:49,703 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:12:49,707 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:13:58,241 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:13:58,244 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:17:04,518 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:17:04,521 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:19:12,753 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:19:12,756 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:19:50,413 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:19:50,415 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:20:41,173 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:20:41,175 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:21:49,597 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:21:49,598 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 10:26:53,125 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 10:26:53,129 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 11:32:22,149 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 11:32:22,151 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 108, in _sample_and_log_power
+    results = header["routing"]["function"](
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 88, in get_intel_power
+    return get_rapl_power(pid_list, logger, **kwargs)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/intel.py", line 332, in get_rapl_power
+    s1 = rapl.RAPLMonitor.sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 177, in sample
+    return RAPLSample.take_sample()
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 122, in take_sample
+    domain = RAPLDomain.construct(current, dirpath)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 47, in construct
+    name, energy_uj, max_energy_range_uj = _get_domain_info(path)
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 19, in _get_domain_info
+    energy_uj = int(_read_sysfs_file("%s/energy_uj" % path))
+  File "/homeStor1/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/cpu/rapl.py", line 12, in _read_sysfs_file
+    with open(path, "r") as f:
+
+2024-01-19 11:54:03,284 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR - Encountered exception within power monitor thread!
+2024-01-19 11:54:03,288 - experiment_impact_tracker.compute_tracker.ImpactTracker - ERROR -   File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 161, in launch_power_monitor
+    _sample_and_log_power(log_dir, initial_info, logger=logger)
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 93, in _sample_and_log_power
+    required_headers = _get_compatible_data_headers(get_current_region_info_cached()[0])
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/compute_tracker.py", line 182, in _get_compatible_data_headers
+    if not compatability_fn(region=region):
+  File "/home/ylan/Sustainability/susai/experiment-impact-tracker/experiment_impact_tracker/gpu/nvidia.py", line 38, in is_nvidia_compatible
+    stdout, stderror = p.communicate()
+  File "/home/ylan/miniconda3/envs/pytorch2/lib/python3.9/subprocess.py", line 1121, in communicate
+    stdout = self.stdout.read()
+

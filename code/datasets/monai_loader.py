@@ -84,7 +84,7 @@ if __name__ == '__main__':
     tile_size = 224
     tile_count = 1000
     home = Path.cwd().parts[1]
-    data_root = f'/{home}/ylan/DeepGraft/'
+    data_root = f'/{home}/datasets/DeepGraft/'
     # labels = [0]
     # data_root = f'/{home}/public/DeepGraft/Aachen_Biopsy_Slides_Extended'
     data = {"training": [{
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     }
     with open('monai_test.json', 'w') as jf:
         json.dump(data, jf)
-    json_data_path = f'/{home}/ylan/DeepGraft/training_tables/dg_decathlon_PAS_HE_Jones_norm_rest.json'
+    json_data_path = f'/homeStor1/ylan/data/DeepGraft/training_tables/dg_decathlon_PAS_HE_Jones_norm_rest.json'
 
     training_list = load_decathlon_datalist(
         data_list_file_path=json_data_path,
@@ -134,7 +134,8 @@ if __name__ == '__main__':
             ToTensord(keys=["image", "label"]),
         ]
     )
-    training_list = data['training']
+    # training_list = data['training']
+    # print(training_list)
     # dataset_train = Dataset(data=training_list)
     dataset_train = Dataset(data=training_list, transform=train_transform)
     # persistent_dataset = PersistentDataset(data=training_list, transform=train_transform, cache_dir='/home/ylan/workspace/test')
@@ -144,14 +145,14 @@ if __name__ == '__main__':
         dataset_train,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=1,
+        num_workers=4,
         pin_memory=True,
         sampler=None,
         collate_fn=list_data_collate,
     )
 
-    print(len(train_loader))
-    start = time.time()
+    # print(len(train_loader))
+    # start = time.time()
     count = 0
 
     # train_transform = LoadImage(reader=WSIReader, backend='openslide', level=3)

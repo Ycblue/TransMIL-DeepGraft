@@ -22,3 +22,5 @@
     Or copy and paste one of these URLs:
         http://localhost:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f
      or http://127.0.0.1:8912/lab?token=74acb08968b367118f6702623072af075627ef97ee8b150f
+[C 2023-07-26 15:00:59.488 ServerApp] received signal 15, stopping
+[I 2023-07-26 15:00:59.850 ServerApp] Shutting down 0 kernels

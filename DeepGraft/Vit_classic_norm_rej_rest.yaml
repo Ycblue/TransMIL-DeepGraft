@@ -6,7 +6,7 @@ General:
     precision: 16
     multi_gpu_mode: ddp
     gpus: [0, 1]
-    epochs: &epoch 500 
+    epochs: &epoch 50 
     grad_acc: 2
     frozen_bn: False
     patience: 50
@@ -43,7 +43,7 @@ Model:
 
 Optimizer:
     opt: Adam
-    lr: 0.00002
+    lr: 0.0002
     opt_eps: null 
     opt_betas: null
     momentum: null 

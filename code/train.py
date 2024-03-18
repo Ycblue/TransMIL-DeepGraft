@@ -20,6 +20,9 @@ from pytorch_lightning.strategies import DDPStrategy
 import torch
 from pytorch_lightning.callbacks import DeviceStatsMonitor
 from pytorch_lightning.tuner import Tuner
+
+from experiment_impact_tracker.data_interface import DataInterface
+from experiment_impact_tracker.compute_tracker import ImpactTracker
 # from train_loop import KFoldLoop
 # from pytorch_lightning.plugins.training_type import DDPPlugin
 
@@ -178,7 +181,7 @@ def main(cfg):
             max_epochs= cfg.General.epochs,
             min_epochs = 100,
             accelerator='gpu',
-            # strategy='ddp',
+            strategy='ddp_find_unused_parameters_true', # inception with frozen params
             # plugins=plugins,
             devices=cfg.General.gpus,
             # replace_sampler_ddp=False,
@@ -204,7 +207,7 @@ def main(cfg):
             callbacks=cfg.callbacks,
             max_epochs= cfg.General.epochs,
             # max_epochs= 2,
-            min_epochs = 100,
+            min_epochs = 500,
 
             # gpus=cfg.General.gpus,
             accelerator='gpu',
@@ -240,7 +243,7 @@ def main(cfg):
 
     #---->train or test
     if cfg.resume_training:
-        last_ckpt = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'last.ckpt'
+        last_ckpt = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}' / 'checkpoints' / 'last.ckpt'
         print('Resume Training from: ', last_ckpt)
         model = model.load_from_checkpoint(checkpoint_path=last_ckpt, cfg=cfg)
         # trainer.fit(model = model, ckpt_path=last_ckpt) #, datamodule = dm
@@ -274,8 +277,10 @@ def main(cfg):
         log_path = Path(cfg.log_path) / 'lightning_logs' / f'version_{cfg.version}'/'checkpoints' 
 
         model_paths = list(log_path.glob('*.ckpt'))
-
-
+        # print(model_paths)
+        # print(f'epoch={cfg.epoch}')
+        # for i in model_paths:
+        #     print(f'epoch={cfg.epoch}' in str(i))
         if not cfg.epoch:
             model_paths = [str(model_path) for model_path in model_paths if f'.ckpt' in str(model_path)]
         elif cfg.epoch == 'last':
@@ -285,11 +290,13 @@ def main(cfg):
         else:
             model_paths = [str(model_path) for model_path in model_paths if f'epoch={cfg.epoch}' in str(model_path)]
         # model_paths = [f'{log_path}/epoch=279-val_loss=0.4009.ckpt']
+        # model_paths = [m for m in model_paths if Path(m).stem[-2]!='v']
         # print(model_paths)
         
         for path in model_paths:
+            print('Epoch: ', path)
         # path  = model_paths[0]
-            if 'last' in path:
+            if 'last' in str(path):
                 epoch = 'last'
             else:
                 name = Path(path).stem
@@ -355,7 +362,7 @@ if __name__ == '__main__':
     cfg.General.server = args.stage
     cfg.Data.fold = args.fold
     cfg.Loss.base_loss = args.loss
-    cfg.Data.bag_size = args.bag_size
+    # cfg.Data.bag_size = args.bag_size
     cfg.version = args.version
     cfg.fine_tune = args.fine_tune
     cfg.resume_training = args.resume_training
@@ -395,5 +402,43 @@ if __name__ == '__main__':
     
 
     # ---->main
+    
+    # tracker = ImpactTracker(f'co2log/')
+    # tracker.launch_impact_monitor()
+
     main(cfg)
  
+
+    # tracker.stop()
+    # data_interface = DataInterface(['co2log'])
+
+    # epochs = 50
+    # # epochs = cfg.epoch
+    # bag_size = 1000
+    # data_size = 3489
+    # print('average bag_size: ', bag_size)
+    # print('====================')
+    # print(f'{cfg.Model.name}')
+    # print('====================')
+    # print('kg_carbon: ', data_interface.kg_carbon)
+    # print('kg_carbon/epoch: ', data_interface.kg_carbon / epochs)
+    # print('g_carbon: ', data_interface.kg_carbon * 1000)
+    # print('g_carbon/epoch: ', data_interface.kg_carbon * 1000 / epochs)
+    # print('g_carbon/slide with 1000 patches: ', 1000*(data_interface.kg_carbon * 1000 / (data_size) / bag_size))
+    # kg_carbon = data_interface.kg_carbon / epochs
+    # print(kg_carbon)
+
+    # '''Netherlands'''
+
+    # txt_path = f'/homeStor1/ylan/workspace/TransMIL-DeepGraft/test/co2_emission/{self.model_name}_vis.txt'
+    # # Path(txt_path).mkdir(exist_ok=True)
+    # bag_size = sum(bag_array) / len(bag_array)
+    # with open(txt_path, 'a') as f:
+    #     f.write(f'==================================================================================== \n')
+    #     f.write(f'Emissions calculated for {data_size} slides, {bag_size} patches/slide, per epoch \n')
+    #     f.write(f'{self.model_name}: {kg_carbon} [kg]\n')
+    #     f.write(f'{self.model_name}: {kg_carbon*1000} [g]\n')
+    #     f.write(f'Emissions calculated for 1 slides, {bag_size} patches/slide, per epoch \n')
+    #     f.write(f'{self.model_name}: {kg_carbon/data_size} [kg]\n')
+    #     f.write(f'{self.model_name}: {kg_carbon*1000/data_size} [g]\n')
+    #     f.write(f'==================================================================================== \n')

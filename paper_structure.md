@@ -2,22 +2,25 @@
 
 ## Abstract
 
-
+Sustainability is important. Therefore a sustainability-minded approach to benchmarking DL models should be employed.
+We benchmark 4 models on two tasks, DeepGraft and RCC classification to show how.
+Additionally we introduce a new metric, combining accuracy and CO2eq which should help better understand the impact of each model.
 
 ## Introduction
 
-Why do we do this
+Sustainability is important. Therefore a sustainability-minded approach to benchmarking DL models should be employed.
+We benchmark 4 models on two tasks, DeepGraft and RCC classification to show how.
+Additionally we introduce a new metric, combining accuracy and CO2eq which should help better understand the impact of each model.
 
 ## Methods
 
-    - Fig: Study design
-        * Choosing the data
-        * Model workflow 
-    
-    Groud truth
-    DL Analyses
+Multiple Instance Learning
 
-    - 
+4 Models: TransMIL, CLAM, ViT, Inception
+
+Task 1: Kidney Transplant Disease Classification 3 class
+
+Task 2: RCC Classification for ccRCC, chRCC, papRCC
 
 ## Dataset
 
@@ -29,7 +32,6 @@ Why do we do this
 Compare models on Normal vs Rest and then choose best Model.
 
     - Fig: Metrics on Testset for Normal vs Rejection vs Rest:
-
 
 | Model        | Accuracy | Precision | Recall | AUROC |
 | ------------ | -------- | --------- | ------ | ----- |
@@ -49,19 +51,18 @@ Compare models on Normal vs Rest and then choose best Model.
 | AttentionMIL |          |           |        |       |
 | TransMIL     |          |           |        |       |
 
- - Two step Models are still better
-    - Fig: AUROC Curves (Best Model, Rest in Appendix)
-    - Fig: Attention Maps (Best Model, Rest in Appendix)
+- Two step Models are still better
 
-- Single Model: 
-    AUROC Curves for each class
-    Prediction Maps on slide + Scale
-    Predictive tiles with Original and GradCam + Scale
-
-- Two step Model: 
-    AUROC Curves for each class
-    Prediction Maps on slide + Scale
-    Predictive tiles with Original and GradCam + Scale
+  - Fig: AUROC Curves (Best Model, Rest in Appendix)
+  - Fig: Attention Maps (Best Model, Rest in Appendix)
+- Single Model:
+  AUROC Curves for each class
+  Prediction Maps on slide + Scale
+  Predictive tiles with Original and GradCam + Scale
+- Two step Model:
+  AUROC Curves for each class
+  Prediction Maps on slide + Scale
+  Predictive tiles with Original and GradCam + Scale
 
 ## Discussion
 

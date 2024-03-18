@@ -4,3 +4,14 @@ test/*
 DeepGraft_Project_Plan_12.7.22.pdf
 monai_test.json
 wandb
+cc_co2log/*
+co2log/*
+code/co2log/*
+dataset_csv/*
+__pycache__/*
+DeepGraft/*
+RCC/*
+code/datasets/__pycache__/*
+code/models/__pycache__/*
+code/MyOptimizer/__pycache__/*
+code/utils/ref-countries-2020-01m.geojson/* 

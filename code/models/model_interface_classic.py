@@ -19,11 +19,11 @@ from MyLoss import create_loss
 from utils.utils import cross_entropy_torch
 from utils.custom_resnet50 import resnet50_baseline
 
-from timm.loss import AsymmetricLossSingleLabel
-from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
-from transformers import ViTForImageClassification
-from libauc.losses import AUCMLoss, AUCM_MultiLabel, CompositionalAUCLoss
-from libauc.optimizers import PESG, PDSCA
+# from timm.loss import AsymmetricLossSingleLabel
+# from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
+# from transformers import ViTForImageClassification
+# from libauc.losses import AUCMLoss, AUCM_MultiLabel, CompositionalAUCLoss
+# from libauc.optimizers import PESG, PDSCA
 #---->
 import torch
 import torch.nn as nn
@@ -37,11 +37,13 @@ from torchmetrics.utilities.compute import _auc_compute_without_check, _auc_comp
 from torch import optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingWarmRestarts
 
-from monai.config import KeysCollection
-from monai.data import Dataset, load_decathlon_datalist
-from monai.data.wsi_reader import WSIReader
-from monai.metrics import Cumulative, CumulativeAverage
-from monai.networks.nets import milmodel
+# from monai.config import KeysCollection
+# from monai.data import Dataset, load_decathlon_datalist
+# from monai.data.wsi_reader import WSIReader
+# from monai.metrics import Cumulative, CumulativeAverage
+# from monai.networks.nets import milmodel
+
+
 
 # from sklearn.metrics import roc_curve, auc, roc_curve_score
 
@@ -73,6 +75,8 @@ LABEL_MAP = {
     'norm_rest': {'0': 'Normal', '1': 'Disease'},
     'rej_rest': {'0': 'Rejection', '1': 'Rest'},
     'norm_rej_rest': {'0': 'Normal', '1': 'Rejection', '2': 'Rest'},
+    'tcmr_abmr': {'0': 'TCMR', '1': 'ABMR'},
+    'big_three': {'0': 'ccRCC', '1': 'papRCC', '2': 'chRCC'}
 
 }
 COLOR_MAP = ['#377eb8', '#ff7f00', '#4daf4a',
@@ -192,21 +196,29 @@ class ModelInterface_Classic(pl.LightningModule):
         if self.model_name == 'features':
             self.model = None
         elif self.model_name == 'inception':
-            # self.model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', pretrained=True)
-            self.model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', weights='Inception_V3_Weights.DEFAULT')
-            self.model.aux_logits = False
-            ct = 0
-            for child in self.model.children():
-                ct += 1
-                if ct < 15:
-                    for parameter in child.parameters():
-                        parameter.requires_grad=False
-            # for parameter in self.model.parameters():
-                # parameter.requires_grad = False
-
+            # self.model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', pretrained=False)
             
+            # for version 13!
+            # self.model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', weights='Inception_V3_Weights.DEFAULT')
+            self.model = torch.hub.load('pytorch/vision:v0.10.0', 'inception_v3', pretrained=True)
+            # self.model = model.inception_v3(pretrained=True)
+            self.model.aux_logits = False
+
+            for parameter in self.model.parameters():
+                parameter.requires_grad = False
+            
+            # ct = 0
+            # for child in self.model.children():
+            #     ct += 1
+            #     if ct < 15:
+            #         for parameter in child.parameters():
+            #             parameter.requires_grad=False
+
             # self.model.AuxLogits.fc = nn.Linear(768, self.n_classes)
-            self.model.fc = nn.Linear(self.model.fc.in_features, self.n_classes)
+            self.model.fc = nn.Sequential(
+                nn.Linear(self.model.fc.in_features, 10),
+                nn.Linear(10, self.n_classes))
+            
         elif self.model_name == 'resnet18':
             self.model = models.resnet18(weights='IMAGENET1K_V1')
             # modules = list(resnet18.children())[:-1]
@@ -244,14 +256,18 @@ class ModelInterface_Classic(pl.LightningModule):
         elif self.model_name == 'vit':
             home = Path.cwd().parts[1]
             # self.model = ViT('B_32_imagenet1k', pretrained = True) #vis=vis
-            self.model = timm.create_model('vit_base_patch16_224', pretrained=True, num_classes=self.n_classes)
+            self.model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=self.n_classes)
             # model = timm.create_model(“vit_base_patch16_224”, pretrained=True)
             for param in self.model.parameters():
                 param.requires_grad = False
             outputs_attrs = self.n_classes
             num_inputs = self.model.head.in_features
-            last_layer = nn.Linear(num_inputs, outputs_attrs)
-            self.model.head = last_layer
+            # last_layer = nn.Linear(num_inputs, outputs_attrs)
+            # self.model.head = last_layer
+            
+            self.model.head = nn.Sequential(
+                nn.Linear(num_inputs, 10),
+                nn.Linear(10, self.n_classes))
             # model_name_or_path = f'/{home}/ylan/workspace/TransMIL-DeepGraft/code/models/ckpt/vit-base-patch16-224/'
             # 'code/models/ckpt/vit-base-patch16-224'
             # self.model = ViTForImageClassification.from_pretrained(
@@ -311,9 +327,11 @@ class ModelInterface_Classic(pl.LightningModule):
 
     def forward(self, x):
         # print(x.shape)
+        
         if len(x.shape) > 4:
             x = x.squeeze(0)
         # print(x.shape)
+        
         return self.model(x)
 
     def step(self, input):
@@ -663,17 +681,16 @@ class ModelInterface_Classic(pl.LightningModule):
 
 
         # print(complete_patient_dict)
-        self.save_results(complete_patient_dict, patient_target)
+        self.save_results(complete_patient_dict, patient_target, mode='test')
 
         opt_threshold = self.load_thresholds(torch.stack(patient_score), torch.stack(patient_target), stage='test', comment='patient')
         
         if self.n_classes > 2:
-            opt_threshold = [0.5] * self.n_classes 
+            opt_threshold = [1/self.n_classes] * self.n_classes 
         else: 
             opt_threshold = [1-opt_threshold, opt_threshold]
         # print(opt_threshold[1])
         self.log_topk_patients(list(complete_patient_dict.keys()), patient_score, thresh=opt_threshold, stage='test')
-
 
         patient_score = torch.stack(patient_score)
         patient_target = torch.stack(patient_target)
@@ -695,8 +712,6 @@ class ModelInterface_Classic(pl.LightningModule):
         
         self.log_dict(self.test_patient_metrics(patient_score, patient_target),
                           on_epoch = True, logger = True, sync_dist=True)
-        
-            
 
         #---->acc log
         for c in range(self.n_classes):
@@ -1066,7 +1081,7 @@ class ModelInterface_Classic(pl.LightningModule):
 
         line_plot.figure.clf()
 
-    def save_results(self, complete_patient_dict, patient_target):
+    def save_results(self, complete_patient_dict, patient_target, mode='train'):
 
         patient_output_dict = {'PATIENT': [], 'yTrue': []}
         slide_output_dict = {'SLIDE': [], 'yTrue': []}
@@ -1084,7 +1099,7 @@ class ModelInterface_Classic(pl.LightningModule):
 
         # json.dump(patient_output_dict, open(f'{self.loggers[0].log_dir}/results.json', 'w'))
         out_df = pd.DataFrame.from_dict(patient_output_dict)
-        out_df.to_csv(f'{self.loggers[0].log_dir}/TEST_RESULT_PATIENT.csv')
+        out_df.to_csv(f'{self.loggers[0].log_dir}/{mode.upper()}_RESULT_PATIENT.csv')
 
         
         label_mapping = LABEL_MAP[self.task]
@@ -1115,7 +1130,7 @@ class ModelInterface_Classic(pl.LightningModule):
 
        
         out_df = pd.DataFrame.from_dict(slide_output_dict)
-        out_df.to_csv(f'{self.loggers[0].log_dir}/TEST_RESULT_SLIDE.csv')
+        out_df.to_csv(f'{self.loggers[0].log_dir}/{mode.upper()}_RESULT_SLIDE.csv')
     
 
 class View(nn.Module):

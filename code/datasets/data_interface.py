@@ -13,8 +13,9 @@ from torchvision import transforms
 # from .camel_dataloader import FeatureBagLoader
 from .custom_dataloader import HDF5MILDataloader
 from .jpg_dataloader import JPGMILDataloader
-from .classic_jpg_dataloader import JPGBagLoader
+from .classic_jpg_dataloader import JPGBagLoader, LazyJPGBagLoader
 from .zarr_feature_dataloader_simple import ZarrFeatureBagLoader
+# from .feature_dataloader_mixed import FeatureBagLoader
 from .feature_dataloader import FeatureBagLoader
 from .local_feature_dataloader import LocalFeatureBagLoader
 from pathlib import Path
@@ -147,10 +148,15 @@ class MILDataModule(pl.LightningDataModule):
         self.model_name = model_name
         self.use_features = use_features
         self.in_features = kwargs['in_features']
-        self.feature_extractor = kwargs['feature_extractor']
+
+        if use_features:
+            self.feature_extractor = kwargs['feature_extractor']
         # if self.feature_
         # elif self.feature_extractor == 'histoencoder':
-        self.fe_name = f'FEATURES_{self.feature_extractor.upper()}_{self.in_features}'
+
+            self.fe_name = f'FEATURES_{self.feature_extractor.upper()}_{self.in_features}'
+        else:
+            self.fe_name = None
 
 
         self.class_weight = []
@@ -158,6 +164,7 @@ class MILDataModule(pl.LightningDataModule):
         self.fe_transform = None
         # print('use_features: ', use_features)
         if self.train_classic: 
+            # self.base_dataloader = LazyJPGBagLoader
             self.base_dataloader = JPGBagLoader
         elif not use_features: 
             self.base_dataloader = JPGMILDataloader
@@ -167,11 +174,16 @@ class MILDataModule(pl.LightningDataModule):
         if model_name == 'resnet50' or model_name == 'CTMIL':
             self.base_dataloader = LocalFeatureBagLoader
 
+        print(f'Using {self.base_dataloader} dataloader')
+
     def setup(self, stage: Optional[str] = None) -> None:
         home = Path.cwd().parts[1]
         # print('batch size: ', self.batch_size)
         # print('valid_data')
         
+        ####
+        # mode='test for valid_data ONLY FOR PROTOTYPING!!!
+        ####
         self.valid_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='val', n_classes=self.n_classes, cache=self.cache, model=self.model_name, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
         if stage in (None, 'fit'):
             # print('self.fine_tune', self.fine_tune)
@@ -184,7 +196,7 @@ class MILDataModule(pl.LightningDataModule):
             # dataset = JPGMILDataloader(self.data_root, label_path=self.label_path, mode='train', n_classes=self.n_classes)
             # print(self.base_dataloader)
             print('Train Data: ', len(self.train_data))
-            # print('Val Data: ', len(self.valid_data))
+            print('Val Data: ', len(self.valid_data))
             # a = int(len(dataset)* 0.8)
             # b = int(len(dataset) - a)
             # self.train_data, self.valid_data = random_split(dataset, [a, b])
@@ -196,6 +208,7 @@ class MILDataModule(pl.LightningDataModule):
         if stage in (None, 'test'):
             
             self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False, model=self.model_name, mixup=False, aug=False, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
+            # self.test_data = self.base_dataloader(self.data_root, label_path=self.label_path, mode='test', n_classes=self.n_classes, cache=False, model=self.model_name, mixup=False, aug=False, feature_extractor=self.fe_name) #, max_bag_size=self.max_bag_size
 
         return super().setup(stage=stage)
 
@@ -211,7 +224,8 @@ class MILDataModule(pl.LightningDataModule):
             # return DataLoader(self.train_data,  batch_size = self.batch_size, num_workers=self.num_workers) #batch_transforms=self.transform, pseudo_batch_dim=True, 
         #sampler=ImbalancedDatasetSampler(self.train_data)
     def val_dataloader(self) -> DataLoader:
-        if self.train_classic:
+        if self.train_classic or not self.use_features:
+
             return DataLoader(self.valid_data, batch_size = self.batch_size, num_workers=self.num_workers)
         else:
             return DataLoader(self.valid_data, batch_size = 1, sampler=ImbalancedDatasetSampler(self.valid_data), num_workers=self.num_workers)

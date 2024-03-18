@@ -46,13 +46,13 @@ class JPGBagLoader(data_utils.Dataset):
         self.cache = False
         self.labels = []
         if model == 'inception':
-            size = 299
+            self.size = 299
         # elif model == 'vit':
-        #     size = 384
-        else: size = 224
+        #     self.size = 384
+        else: self.size = 224
         
         home = Path.cwd().parts[1]
-        self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an.json'
+        self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an_ext.json'
         # self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an.json'
         with open(self.slide_patient_dict_path, 'r') as f:
             self.slide_patient_dict = json.load(f)
@@ -61,7 +61,8 @@ class JPGBagLoader(data_utils.Dataset):
         with open(self.label_path, 'r') as f:
             json_dict = json.load(f)
             temp_slide_label_dict = json_dict[self.mode]
-            # print(len(temp_slide_label_dict))
+            # temp_slide_label_dict = json_dict['train'] #export train metrics
+            print(len(temp_slide_label_dict))
             for (x,y) in temp_slide_label_dict:
                 x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
                 x_name = Path(x).stem
@@ -118,10 +119,10 @@ class JPGBagLoader(data_utils.Dataset):
         
             myTransforms.RandomGaussBlur(radius=[0.5, 1.5]),
             myTransforms.RandomAffineCV2(alpha=0.1),
-            myTransforms.RandomElastic(alpha=2, sigma=0.06),
+            # myTransforms.RandomElastic(alpha=2, sigma=0.06),
         ])
 
-        self.resize_transforms = transforms.Resize((size,size), transforms.InterpolationMode.BICUBIC)
+        self.resize_transforms = transforms.Resize((self.size,self.size), transforms.InterpolationMode.BICUBIC)
 
         # sometimes = lambda aug: iaa.Sometimes(0.5, aug, name="Random1")
         # sometimes2 = lambda aug: iaa.Sometimes(0.2, aug, name="Random2")
@@ -162,8 +163,6 @@ class JPGBagLoader(data_utils.Dataset):
         ])
 
 
-
-
         
 
     def get_data(self, query):
@@ -172,6 +171,9 @@ class JPGBagLoader(data_utils.Dataset):
 
         # img = np.asarray(Image.open(patch_path)).astype(np.uint8)
         img = Image.open(patch_path)
+        # img=  
+        # img = img.resize((self.size, self.size), Image.BICUBIC)
+
         # img = np.moveaxis(img, 2, 0)
         # print(img.shape)
         # img = torch.from_numpy(img)
@@ -179,15 +181,6 @@ class JPGBagLoader(data_utils.Dataset):
         # patient = tile_name.rsplit('_', 1)[0]
         patient = self.slide_patient_dict[wsi_name]
 
-        # for tile_path in Path(file_path).iterdir():
-        #     img = np.asarray(Image.open(tile_path)).astype(np.uint8)
-        #     img = np.moveaxis(img, 2, 0)
-        #     # print(img.shape)
-        #     img = torch.from_numpy(img)
-        #     wsi_batch.append(img)
-        #     name_batch.append(tile_path.stem)
-
-        # wsi_batch = torch.stack(wsi_batch)
         return img, label, (wsi_name, tile_name, patient)
     
     def get_labels(self, indices):
@@ -250,15 +243,12 @@ class JPGBagLoader(data_utils.Dataset):
                 #     img = self.val_transforms(img, return_tesnors='pt')
                 # else:
                 img = self.resize_transforms(img)
-                img = self.color_transforms(img)
+                # img = self.color_transforms(img)
                 img = self.train_transforms(img)
 
                 # save_img(img, f'{tile_name}')
 
                 img = self.val_transforms(img.copy())
-
-                
-                # ft = ft.view(-1, 512)
                 
             else:
                 img, label, (wsi_name, tile_name, patient) = self.get_data(t)
@@ -281,6 +271,188 @@ def save_img(img, comment):
     img = img.convert('RGB')
     img.save(f'{outputPath}/{comment}.jpg')
 
+
+class LazyJPGBagLoader(data_utils.Dataset):
+    def __init__(self, file_path, label_path, mode, n_classes, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, model='', **kargs):
+        super().__init__()
+
+        self.data_info = []
+        self.data_cache = {}
+        self.slideLabelDict = {}
+        self.files = []
+        self.data_cache_size = data_cache_size
+        self.mode = mode
+        self.file_path = file_path
+        # self.csv_path = csv_path
+        self.label_path = label_path
+        self.n_classes = n_classes
+        self.max_bag_size = max_bag_size
+        self.min_bag_size = 50
+        self.empty_slides = []
+        self.corrupt_slides = []
+        self.cache = cache
+        self.labels = []
+        if model == 'inception':
+            self.size = 299
+        # elif model == 'vit':
+        #     size = 384
+        else: self.size = 224
+        self.cached_data = []
+        
+        home = Path.cwd().parts[1]
+        self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an_ext.json'
+        # self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an.json'
+        with open(self.slide_patient_dict_path, 'r') as f:
+            self.slide_patient_dict = json.load(f)
+        
+        # read labels and slide_path from csv
+        with open(self.label_path, 'r') as f:
+            json_dict = json.load(f)
+            temp_slide_label_dict = json_dict[self.mode]
+            # temp_slide_label_dict = json_dict['train'] #export train metrics
+            # print(len(temp_slide_label_dict))
+            for (x,y) in temp_slide_label_dict:
+                x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
+                x_name = Path(x).stem
+                x_path_list = [Path(self.file_path)/x]
+                if x_name in self.slide_patient_dict.keys():
+                    for x_path in x_path_list:
+                        if x_path.exists():
+                            # print(len(list(x_path.glob('*'))))
+
+                            self.slideLabelDict[x_name] = y
+                            self.labels += [int(y)]*len(list(x_path.glob('*')))
+                            # self.labels.append(int(y))
+                            for patch_path in x_path.iterdir():
+                                self.files.append((patch_path, x_name, y))
+        random.shuffle(self.files)
+
+        self.color_transforms = myTransforms.Compose([
+            myTransforms.ColorJitter(
+                brightness = (0.65, 1.35), 
+                contrast = (0.5, 1.5),
+                # saturation=(0, 2), 
+                # hue=0.3,
+                ),
+            # myTransforms.RandomChoice([myTransforms.ColorJitter(saturation=(0, 2), hue=0.3),
+            #                             myTransforms.HEDJitter(theta=0.05)]),
+            myTransforms.HEDJitter(theta=0.005),
+            
+        ])
+        # self.color_transforms = myTransforms.Compose([
+        #     myTransforms.Grayscale(num_output_channels=3)
+        # ])
+        self.train_transforms = myTransforms.Compose([
+            myTransforms.RandomChoice([myTransforms.RandomHorizontalFlip(p=0.5),
+                                        myTransforms.RandomVerticalFlip(p=0.5),
+                                        myTransforms.AutoRandomRotation()]),
+        
+            myTransforms.RandomGaussBlur(radius=[0.5, 1.5]),
+            myTransforms.RandomAffineCV2(alpha=0.1),
+            myTransforms.RandomElastic(alpha=2, sigma=0.06),
+        ])
+
+        self.resize_transforms = transforms.Resize((self.size,self.size), transforms.InterpolationMode.BICUBIC)
+
+        self.val_transforms = transforms.Compose([
+            # 
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+            # RangeNormalization(),
+        ])
+
+        for f_info in tqdm(self.files):
+            self._add_data_infos(f_info, self.cache)
+
+    def _add_data_infos(self, file_info, load_data):
+        patch_path, wsi_name, label = file_info
+
+        label = self.slideLabelDict[wsi_name]
+        tile_name = Path(patch_path).stem
+        patient = self.slide_patient_dict[wsi_name]
+        idx = -1
+        self.data_info.append({'data_path': patch_path, 'label': label, 'wsi_name': wsi_name, 'tile_name': tile_name, 'patient': patient, 'cache_idx': idx})
+
+    def _add_to_cache(self, data, data_path):
+        """Adds data to the cache and returns its index. There is one cache
+        list for every file_path, containing all datasets in that file.
+        """
+        if data_path not in self.data_cache:
+            self.data_cache[data_path] = [data]
+        else:
+            self.data_cache[data_path].append(data)
+        return len(self.data_cache[data_path]) - 1
+
+    def _load_data(self, file_path):
+
+        img = Image.open(file_path)
+        img = img.resize((self.size, self.size), Image.BICUBIC)
+        tile_name = Path(file_path).stem
+        # patient = self.slide_patient_dict[wsi_name]
+        idx = self._add_to_cache(img, file_path)
+        file_idx = next(i for i,v in enumerate(self.data_info) if v['data_path'] == file_path)
+        self.data_info[file_idx + idx]['cache_idx'] = idx
+        if len(self.data_cache) > self.data_cache_size:
+            # remove one item from the cache at random
+            removal_keys = list(self.data_cache)
+            removal_keys.remove(file_path)
+            self.data_cache.pop(removal_keys[0])
+            # remove invalid cache_idx
+            # self.data_info = [{'data_path': di['data_path'], 'label': di['label'], 'shape': di['shape'], 'name': di['name'], 'cache_idx': -1} if di['data_path'] == removal_keys[0] else di for di in self.data_info]
+            self.data_info = [{'data_path': di['data_path'], 'label': di['label'], 'wsi_name': di['wsi_name'], 'tile_name': di['tile_name'], 'patient': di['patient'], 'cache_idx': -1} if di['data_path'] == removal_keys[0] else di for di in self.data_info]
+
+
+    def get_labels(self, indices):
+        return [self.labels[i] for i in indices]
+    
+    def get_data(self, i):
+        """Call this function anytime you want to access a chunk of data from the
+            dataset. This will make sure that the data is loaded in case it is
+            not part of the data cache.
+            i = index
+        """
+        # fp = self.get_data_infos(type)[i]['data_path']
+        fp = self.data_info[i]['data_path']
+        if fp not in self.data_cache:
+            self._load_data(fp)
+        
+        # get new cache_idx assigned by _load_data_info
+        # cache_idx = self.get_data_infos(type)[i]['cache_idx']
+        cache_idx = self.data_info[i]['cache_idx']
+        label = self.data_info[i]['label']
+        wsi_name = self.data_info[i]['wsi_name']
+        tile_name = self.data_info[i]['tile_name']
+        patient = self.data_info[i]['patient']
+        # print(self.data_cache[fp][cache_idx])
+        return self.data_cache[fp][cache_idx], label, (wsi_name, tile_name, patient)
+
+    
+
+    def __len__(self):
+        # return len(self.files)
+        return len(self.data_info)
+    
+
+    def __getitem__(self, index):
+
+
+        img, label, (wsi_name, tile_name, patient) = self.get_data(index)
+    
+        if self.mode == 'train':
+            
+            # img = self.color_transforms(img)
+            img = self.train_transforms(img)
+            img = self.val_transforms(img.copy())
+        else: 
+            img = self.val_transforms(img)
+
+        return img, label, (wsi_name, tile_name, patient)
+
+
+
 if __name__ == '__main__':
     
     from pathlib import Path
@@ -288,6 +460,8 @@ if __name__ == '__main__':
     import time
     from fast_tensor_dl import FastTensorDataLoader
     from custom_resnet50 import resnet50_baseline
+    from utils import myTransforms
+
     
     
 
@@ -303,7 +477,7 @@ if __name__ == '__main__':
 
     n_classes = 2
 
-    dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', model='vit', n_classes=n_classes, cache=False)
+    dataset = LazyJPGBagLoader(data_root, label_path=label_path, mode='train', model='inception', n_classes=n_classes, cache=True, data_cache_size=5000)
     # dataset = JPGBagLoader(data_root, label_path=label_path, mode='train', n_classes=n_classes, cache=False)
 
     # print(dataset.get_labels(0))
@@ -315,7 +489,7 @@ if __name__ == '__main__':
     # b = int(len(dataset) - a)
     # train_ds, val_ds = torch.utils.data.random_split(dataset, [a, b])
     # dl = FastTensorDataLoader(dataset, batch_size=1, shuffle=False)
-    dl = DataLoader(dataset, batch_size=100, num_workers=8, pin_memory=True)
+    dl = DataLoader(dataset, batch_size=2000, num_workers=4, pin_memory=True)
     # print(len(dl))
     # dl = DataLoader(dataset, batch_size=1, sampler=ImbalancedDatasetSampler(dataset), num_workers=5)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

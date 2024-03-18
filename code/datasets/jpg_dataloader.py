@@ -17,13 +17,15 @@ import cv2
 import json
 from imgaug import augmenters as iaa
 from torchsampler import ImbalancedDatasetSampler
-from .utils import myTransforms
+# from .utils import myTransforms
 import re
 from monai.networks.nets import milmodel
 import torch.nn as nn
+# from experiment_impact_tracker.data_interface import DataInterface
+
 
 class JPGMILDataloader(data_utils.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, model=None, data_cache_size=100, max_bag_size=1000, cache=False, mixup=False, aug=False, patients=None, slides=None):
+    def __init__(self, file_path, label_path, mode, n_classes, model=None, data_cache_size=100, max_bag_size=500, cache=False, mixup=False, aug=False, patients=None, slides=None, **kwargs):
         super().__init__()
 
         self.data_info = []
@@ -43,15 +45,21 @@ class JPGMILDataloader(data_utils.Dataset):
         self.cache = False
         self.labels = []
         self.slides_to_process = []
+        
+        project = Path(label_path).parts[4]
+        
 
         # self.features = []
         # self.labels = []
         # self.wsi_names = []
         # self.name_batches = []
         # self.patients = []
-        home = Path.cwd().parts[1]
+        # home = Path.cwd().parts[1]
 
-        self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an_ext.json'
+        # self.slide_patient_dict_path = f'/homeStor1/ylan/data/DeepGraft/training_tables/slide_patient_dict_an_ext.json'
+        # self.slide_patient_dict_path = f'/homeStor1/ylan/data/RCC/training_tables/slide_patient_dict_an_ext.json'
+        self.slide_patient_dict_path = f'/homeStor1/ylan/data/{project}/training_tables/slide_patient_dict_an_ext.json'
+        
         # self.slide_patient_dict_path = Path(self.label_path).parent / 'slide_patient_dict_an.json'
         with open(self.slide_patient_dict_path, 'r') as f:
             self.slide_patient_dict = json.load(f)
@@ -71,14 +79,18 @@ class JPGMILDataloader(data_utils.Dataset):
 
             for (x,y) in temp_slide_label_dict:
                 
-                if self.mode == 'test':
-                    x = x.replace('FEATURES_RETCCL_2048', 'TEST')
+                # if self.mode == 'test':
+                #     x = x.replace('FEATURES_RETCCL_2048', 'TEST')
+                #     # x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
                     
-                else:
-                    x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
+                # else:
+                x = x.replace('FEATURES_RETCCL_2048', 'BLOCKS')
+                
                 # print(x)
                 x_name = Path(x).stem
+                # print(x_name)
                 if x_name in self.slide_patient_dict.keys():
+                    # print(x_name)
                     if patients:
                         if self.slide_patient_dict[x_name] in patients:
                             x_path_list = [Path(self.file_path)/x]
@@ -94,6 +106,8 @@ class JPGMILDataloader(data_utils.Dataset):
                         if x_name in slides:
                             x_path_list = [Path(self.file_path)/x]
                             for x_path in x_path_list:
+                                # print(x_path)
+                                # print(x_path.exists())
                                 if x_path.exists():
                                     self.slideLabelDict[x_name] = y
                                     self.labels += [int(y)]*len(list(x_path.glob('*')))
@@ -103,10 +117,13 @@ class JPGMILDataloader(data_utils.Dataset):
                         for x_path in x_path_list:
                             if x_path.exists():
                                 # print(len(list(x_path.glob('*'))))
-                                self.slideLabelDict[x_name] = y
-                                self.labels += [int(y)]*len(list(x_path.glob('*')))
-                                # self.labels.append(int(y))
-                                self.files.append(x_path)
+                                if len(list(x_path.iterdir())) > 0:
+
+                                    self.slideLabelDict[x_name] = y
+                                    # self.labels += [int(y)]*len(list(x_path.glob('*')))
+                                    self.labels.append(int(y))
+                                    self.files.append(x_path)
+        print(self.files)
         # with open(self.label_path, 'r') as f:
         #     temp_slide_label_dict = json.load(f)[mode]
         #     print(len(temp_slide_label_dict))
@@ -126,23 +143,23 @@ class JPGMILDataloader(data_utils.Dataset):
 
         # def get_transforms_2():
         
-        self.color_transforms = myTransforms.Compose([
-            myTransforms.ColorJitter(
-                brightness = (0.65, 1.35), 
-                contrast = (0.5, 1.5),
-                ),
-            myTransforms.HEDJitter(theta=0.005),
+        # self.color_transforms = myTransforms.Compose([
+        #     myTransforms.ColorJitter(
+        #         brightness = (0.65, 1.35), 
+        #         contrast = (0.5, 1.5),
+        #         ),
+        #     myTransforms.HEDJitter(theta=0.005),
             
-        ])
-        self.train_transforms = myTransforms.Compose([
-            myTransforms.RandomChoice([myTransforms.RandomHorizontalFlip(p=0.5),
-                                        myTransforms.RandomVerticalFlip(p=0.5),
-                                        myTransforms.AutoRandomRotation()]),
+        # ])
+        # self.train_transforms = myTransforms.Compose([
+        #     myTransforms.RandomChoice([myTransforms.RandomHorizontalFlip(p=0.5),
+        #                                 myTransforms.RandomVerticalFlip(p=0.5),
+        #                                 myTransforms.AutoRandomRotation()]),
         
-            myTransforms.RandomGaussBlur(radius=[0.5, 1.5]),
-            myTransforms.RandomAffineCV2(alpha=0.1),
-            myTransforms.RandomElastic(alpha=2, sigma=0.06),
-        ])
+        #     myTransforms.RandomGaussBlur(radius=[0.5, 1.5]),
+        #     myTransforms.RandomAffineCV2(alpha=0.1),
+        #     myTransforms.RandomElastic(alpha=2, sigma=0.06),
+        # ])
 
         self.val_transforms = transforms.Compose([
             # 
@@ -260,6 +277,8 @@ class JPGMILDataloader(data_utils.Dataset):
     
     def get_labels(self, indices):
         return [self.labels[i] for i in indices]
+    def get_labels(self):
+        return self.labels
 
 
     def to_fixed_size_bag(self, bag, names, bag_size: int = 250):
@@ -268,7 +287,7 @@ class JPGMILDataloader(data_utils.Dataset):
 
         bag_idxs = torch.randperm(bag.shape[0])[:bag_size]
         bag_samples = bag[bag_idxs]
-        name_samples = [names[i] for i in bag_idxs]
+        name_samples = torch.stack([names[i] for i in bag_idxs])
         zero_padded = torch.cat((bag_samples,
                                 torch.zeros(bag_size-bag_samples.shape[0], bag_samples.shape[1], bag_samples.shape[2], bag_samples.shape[3])))
         return zero_padded, name_samples, min(bag_size, len(bag))
@@ -335,6 +354,7 @@ class JPGMILDataloader(data_utils.Dataset):
         else:
             batch, (wsi_name, batch_coords, patient) = self.get_data(t)
             label = self.labels[index]
+            # out_batch, batch_coords, _ = self.to_fixed_size_bag(batch, batch_coords, self.max_bag_size)
             out_batch = batch
 
         # return out_batch, label, (wsi_name, patient)
@@ -365,11 +385,11 @@ if __name__ == '__main__':
 
     home = Path.cwd().parts[1]
     # train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train.csv'
-    data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    data_root = f'/homeStor1/ylan/data/RCC/224_256uM_annotated'
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
     # label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
-    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_norm_rest_val_1.json'
+    label_path = f'/homeStor1/ylan/data/RCC/training_tables/rcc_limit_10_split_HE_big_three.json'
     # output_dir = f'/{data_root}/debug/augments'
     # os.makedirs(output_dir, exist_ok=True)
 
@@ -416,6 +436,7 @@ if __name__ == '__main__':
     # label_count = [0] *n_classes
     # # print(len(dl))
     start = time.time()
+
     for item in tqdm(dl): 
 
         # if c >= 10:

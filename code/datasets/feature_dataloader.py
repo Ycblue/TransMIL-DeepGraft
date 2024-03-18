@@ -18,12 +18,13 @@ import json
 import cv2
 from PIL import Image
 import h5py
+import math
 # from models import TransMIL
 
 
 
 class FeatureBagLoader(data.Dataset):
-    def __init__(self, file_path, label_path, mode, n_classes, model='None',cache=False, mixup=False, aug=False, mix_res=False, data_cache_size=5000, max_bag_size=1000, **kwargs):
+    def __init__(self, file_path, label_path, mode, n_classes, model='None',cache=False, mixup=False, aug=False, mix_res=False, data_cache_size=5000, max_bag_size=1000, slides=None,**kwargs):
         super().__init__()
 
         self.data_info = []
@@ -53,15 +54,19 @@ class FeatureBagLoader(data.Dataset):
         # print(kwargs.keys())
         if 'feature_extractor' in kwargs.keys():
             self.feature_extractor = kwargs['feature_extractor']
+        else: self.feature_extractor = 'FEATURES_RETCCL_2048'
             # print('self.feature_extractor: ', self.feature_extractor)
             # self.fe_name = f'FEATURES_{self.feature_extractor.upper()}_{self.in_features}'
-        # print(self.feature_extractor)
-
+        
         # print('Using FeatureBagLoader: ', self.mode)
 
         home = Path.cwd().parts[1]
         
-        self.slide_patient_dict_path = f'/{home}/ylan/data/DeepGraft/training_tables/slide_patient_dict_an_ext.json'
+        # print(self.label_path)
+        project = Path(label_path).parts[4]
+        
+        # print(project)
+        self.slide_patient_dict_path = f'/homeStor1/ylan/data/{project}/training_tables/slide_patient_dict_an_ext.json'
         with open(self.slide_patient_dict_path, 'r') as f:
             self.slide_patient_dict = json.load(f)
 
@@ -72,9 +77,9 @@ class FeatureBagLoader(data.Dataset):
             if self.mode == 'fine_tune':
                 temp_slide_label_dict = json_dict['train'] + json_dict['test_mixin']
             else: temp_slide_label_dict = json_dict[self.mode]
-            # temp_slide_label_dict = json_dict['train']
+            # temp_slide_label_dict = json_dict['val']
             # temp_slide_label_dict = json_dict['train'] + json_dict['test_mixin'] # simulate fine tuning
-            
+            print('len(temp_slide_label_dict): ', len(temp_slide_label_dict))
             for (x,y) in temp_slide_label_dict:
                 
                 # test_path = Path(self.file_path)
@@ -95,38 +100,61 @@ class FeatureBagLoader(data.Dataset):
                 # print(x)
                 # print(x_name)
                 if x_name in self.slide_patient_dict.keys():
-                    x_path_list = [Path(self.file_path)/x]
-                    # x_name = x.stem
-                    # x_path_list = [Path(self.file_path)/ x for (x,y) in temp_slide_label_dict]
-                    # print(x)
-                    if self.aug:
-                        for i in range(10):
-                            aug_path = Path(self.file_path)/f'{x}_aug{i}'
-                            if self.use_1024:
-                                aug_path = Path(f'{aug_path}-1024')
-                            if aug_path.exists():
-                                # aug_path = Path(self.file_path)/f'{x}_aug{i}'
-                                x_path_list.append(aug_path)
-                    else: 
-                        aug_path = Path(self.file_path)/f'{x}_aug0'
-                        if self.use_1024:
-                            aug_path = Path(f'{aug_path}-1024')
-                        if aug_path.exists():
-                            x_path_list.append(aug_path)
-                    # print('x_path_list: ', len(x_path_list))
-                    for x_path in x_path_list: 
-                        # print(x_path)
-                        # print(x_path)
-                        # x_path = Path(f'{x_path}.pt')
-                        if x_path.exists():
-                            self.slideLabelDict[x_name] = y
-                            self.labels.append(int(y))
-                            self.files.append(x_path)
-                        elif Path(str(x_path) + '.zarr').exists():
-                            self.slideLabelDict[x] = y
-                            self.files.append(str(x_path)+'.zarr')
-                        else:
-                            self.missing.append(x)
+
+                    
+                    if slides:
+                        if x_name in slides:
+                            x_path_list = [Path(self.file_path)/x]
+                            
+                            for x_path in x_path_list:
+                                if x_path.exists():
+                                    
+                                    self.slideLabelDict[x_name] = y
+                                    self.labels.append(int(y))
+                                    self.files.append(x_path)
+
+                    else:
+                        x_path_list = [Path(self.file_path)/x]
+                        # x_name = x.stem
+                        # x_path_list = [Path(self.file_path)/ x for (x,y) in temp_slide_label_dict]
+                        # print(x)
+                        # if self.aug:
+                        #     for i in range(10):
+                        #         aug_path = Path(self.file_path)/f'{x}_aug{i}'
+                        #         if self.use_1024:
+                        #             aug_path = Path(f'{aug_path}-1024')
+                        #         if aug_path.exists():
+                        #             # aug_path = Path(self.file_path)/f'{x}_aug{i}'
+                        #             x_path_list.append(aug_path)
+                        # else: 
+                        #     aug_path = Path(self.file_path)/f'{x}_aug0'
+                        #     if self.use_1024:
+                        #         aug_path = Path(f'{aug_path}-1024')
+                        #     if aug_path.exists():
+                        #         x_path_list.append(aug_path)
+                        # print('x_path_list: ', len(x_path_list))
+
+                        for x_path in x_path_list: 
+                            # print(x_path)
+                            # print(x_path)
+                            # x_path = Path(f'{x_path}.pt')
+                            if x_path.exists():
+                                self.slideLabelDict[x_name] = y
+                                self.labels.append(int(y))
+                                self.files.append(x_path)
+                            elif Path(str(x_path) + '.zarr').exists():
+                                self.slideLabelDict[x] = y
+                                self.files.append(str(x_path)+'.zarr')
+                            else:
+                                self.missing.append(x)
+
+                            ### 1024
+                            # x_1024_path = Path(str(x_path).replace('256', '1024'))
+                            # if x_1024_path.exists():
+                            #     self.slideLabelDict[x_name] = y
+                            #     self.labels.append(int(y))
+                            #     self.files.append(x_1024_path)
+
                 # print(x, y)
                 # x_complete_path = Path(self.file_path)/Path(x)
                 # for cohort in Path(self.file_path).iterdir():
@@ -176,23 +204,23 @@ class FeatureBagLoader(data.Dataset):
 
 
         
-
+        # print('files: ', self.files)
         self.feature_bags = []
         
         self.wsi_names = []
         self.coords = []
         self.patients = []
-        if self.cache:
-            for t in tqdm(self.files):
-                # zarr_t = str(t) + '.zarr'
-                batch, (wsi_name, batch_coords, patient) = self.get_data(t)
+        # if self.cache:
+        #     for t in tqdm(self.files):
+        #         # zarr_t = str(t) + '.zarr'
+        #         batch, (wsi_name, batch_coords, patient) = self.get_data(t)
 
-                # print(label)
-                # self.labels.append(label)
-                self.feature_bags.append(batch)
-                self.wsi_names.append(wsi_name)
-                self.coords.append(batch_coords)
-                self.patients.append(patient)
+        #         # print(label)
+        #         # self.labels.append(label)
+        #         self.feature_bags.append(batch)
+        #         self.wsi_names.append(wsi_name)
+        #         self.coords.append(batch_coords)
+        #         self.patients.append(patient)
         # else: 
         #     for t in tqdm(self.files):
         #         self.labels = 
@@ -204,8 +232,12 @@ class FeatureBagLoader(data.Dataset):
         wsi_name = Path(file_path).stem
         # base_file = file_path.with_suffix('')
         # if wsi_name.split('_')[-1][:3] == 'aug':
-        parts = wsi_name.rsplit('_', 1)
-        if parts[1][:3] == 'aug':
+        # print(wsi_name)
+        
+        # print(len(parts[1]))
+        # if len(parts[1]) > 2:
+        if 'aug' in wsi_name:
+            parts = wsi_name.rsplit('_', 1)
             if parts[1].split('-')[0] == '1024':
                 wsi_name = parts[0]
             else: 
@@ -247,6 +279,8 @@ class FeatureBagLoader(data.Dataset):
     #     # for i in indices: 
     #     #     print(self.labels[i])
     #     return [self.labels[i] for i in indices]
+        
+
     def get_labels(self):
         return self.labels
 
@@ -302,7 +336,9 @@ class FeatureBagLoader(data.Dataset):
 
         if self.cache:
             label = self.labels[index]
+            # print()
             bag = self.feature_bags[index]
+            
             
             wsi_name = self.wsi_names[index]
             batch_coords = self.coords[index]
@@ -332,6 +368,16 @@ class FeatureBagLoader(data.Dataset):
                 # bag_size = bag.shape[0]
                 # bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
                 # out_bag = bag[bag_idxs, :]
+                np.random.seed(0)
+                draw_size = math.ceil(bag.shape[0] * 0.1)
+                # draw_size=10
+                draw_indices = np.random.choice(bag.shape[0], draw_size)
+                # print(draw_indices)
+                bag = bag[draw_indices, :]
+                # print('bag: ',bag.shape)
+                # print('out_bag: ', out_bag.shape)
+                
+                
                 out_bag = bag
         else:
             t = self.files[index]
@@ -371,6 +417,17 @@ class FeatureBagLoader(data.Dataset):
                 # bag_size = bag.shape[0]
                 # bag_idxs = torch.randperm(bag_size)[:self.max_bag_size]
                 # out_bag = bag[bag_idxs, :]
+                ###
+                # random draw experiment: [10%, 20%, 30%, 40%, 50%]
+                np.random.seed(0)
+                draw_size = math.ceil(bag.shape[0] * 0.1)
+                # draw_size=10
+                draw_indices = np.random.choice(bag.shape[0], draw_size)
+                # print(draw_indices)
+                bag = bag[draw_indices, :]
+                # print('bag: ',bag.shape)
+                # print('out_bag: ', out_bag.shape)
+
                 out_bag = bag
 
             # print('feature_dataloader: ', out_bag.shape)
@@ -392,81 +449,58 @@ if __name__ == '__main__':
     
     home = Path.cwd().parts[1]
     train_csv = f'/{home}/ylan/DeepGraft_project/code/debug_train.csv'
-    data_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    ktx_root = f'/{home}/ylan/data/DeepGraft/224_256uM_annotated'
+    rcc_root = f'/{home}/ylan/data/RCC/224_256uM_annotated'
     # data_root = f'/{home}/ylan/DeepGraft/dataset/hdf5/256_256um_split/'
     # label_path = f'/{home}/ylan/DeepGraft_project/code/split_PAS_bin.json'
     # label_path = f'/{home}/ylan/DeepGraft/training_tables/split_debug.json'
-    label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_rest_rej_ext.json'
+    ktx_label_path = f'/{home}/ylan/data/DeepGraft/training_tables/dg_split_PAS_HE_Jones_Grocott_norm_rej_rest_ext_2.json'
+    rcc_label_path = f'/{home}/ylan/data/RCC/training_tables/rcc_split_HE_big_three_ext.json'
     # output_dir = f'/{data_root}/debug/augments'
     # os.makedirs(output_dir, exist_ok=True)
-    n_classes = 2
+    n_classes = 3
 
-    train_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, mixup=True, aug=True, n_classes=n_classes, max_bag_size=200)
-    print('train_dataset: ', len(train_dataset))
+    ktx_test_dataset = FeatureBagLoader(ktx_root, label_path=ktx_label_path, mode='test', cache=False, mixup=False, aug=False, n_classes=n_classes)
+    rcc_test_dataset = FeatureBagLoader(rcc_root, label_path=rcc_label_path, mode='test', cache=False, mixup=False, aug=False, n_classes=n_classes)
+    ktx_dl = DataLoader(ktx_test_dataset, batch_size=1) #
+    rcc_dl = DataLoader(rcc_test_dataset, batch_size=1) #
 
-    train_dl = DataLoader(train_dataset, batch_size=1) #
-
-    print('train_dl: ', len(train_dl))
-
-    # train_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='train', cache=False, n_classes=n_classes, model='None', aug=True, mixup=True)
-    # test_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='test', cache=False, n_classes=n_classes, model='None', aug=True, mixup=True)
-    # test_dl = DataLoader(test_dataset, batch_size=1)
-    # print('test_dl: ', len(test_dl))
-
-    # # print(dataset.get_labels(0))
-    # # a = int(len(dataset)* 0.8)
-    # # b = int(len(dataset) - a)
-    # # train_data, valid_data = random_split(dataset, [a, b])
-
-    # val_dataset = FeatureBagLoader(data_root, label_path=label_path, mode='val', cache=False, mixup=False, aug=False, n_classes=n_classes, model='None')
-    # valid_dl = DataLoader(val_dataset, batch_size=1)
-    # print('valid_dl: ', len(valid_dl))
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # scaler = torch.cuda.amp.GradScaler()
-
-    # model_ft = resnet50_baseline(pretrained=True)
-    # for param in model_ft.parameters():
-    #     param.requires_grad = False
-    # model_ft.to(device)
-    # model = TransMIL(n_classes=n_classes).to(device)
-    
-
-    # print(dataset.get_labels(np.arange(len(dataset))))
-    pca = PCA(0.95)
-    c = 0
-    label_count = [0] *n_classes
     epochs = 1
-    # print(len(dl))
-    # start = time.time()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    bag_size_dict = {'RCC': [], 'KTX': []}
 
-    pca_tensor = []
+    patient_dict = {}
 
     for i in range(epochs):
         start = time.time()
-        for item in tqdm(train_dl): 
-            if c >= 1000:
-                break
-            # print(item)
-            bag, label, (name, patient) = item
-            
-            # print(bag.shape)
-            
-            # print(pca.explained_variance_ratio_)
-            # print(pca.n_components_)
-            # train_pca = pca.transform(x_train)
-            # print(x_train.shape)
-            pca_tensor.append(bag.squeeze())
-            
-            c += 1
+        for item in tqdm(ktx_dl): 
+            bag, label, (name, bc, patient) = item
+            print(bag.shape)
+            bag_size_dict['KTX'].append(bag.shape)
         end = time.time()
-        print('Bag Time: ', end-start)
-
-
-
-    pca_tensor = torch.cat(pca_tensor, dim=0)
-    print(pca_tensor.shape)
-    x_train = pca.fit_transform(pca_tensor.squeeze())
-    print(pca.n_components_)
-    print(pca.components_)
-    print(x_train.shape)
+    for i in range(epochs):
+        start = time.time()
+        for item in tqdm(rcc_dl): 
+            bag, label, (name, bc, patient) = item
+            print(bag.shape)
+            bag_size_dict['RCC'].append(bag.shape)
+        end = time.time()
+        
+    print(bag_size_dict)
+    # print(len(patient_dict.keys()))
+    
+    # for k in patient_dict.keys():
+    #     # print(patient_dict[k])
+    #     if len(patient_dict[k]) > 3:
+    #         print(patient_dict[k])
+        # break
+ 
+    output_path = '/homeStor1/ylan/npj_sus_data/bag_size_dict.json'
+    json.dump(bag_size_dict, open(output_path, 'w'))
+    # with 
+    # pca_tensor = torch.cat(pca_tensor, dim=0)
+    # print(pca_tensor.shape)
+    # x_train = pca.fit_transform(pca_tensor.squeeze())
+    # print(pca.n_components_)
+    # print(pca.components_)
+    # print(x_train.shape)

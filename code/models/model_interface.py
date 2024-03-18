@@ -12,7 +12,7 @@ plt.style.use('tableau-colorblind10')
 import pandas as pd
 import cv2
 from PIL import Image
-from pytorch_pretrained_vit import ViT
+# from pytorch_pretrained_vit import ViT
 # import wandb
 from scipy.stats import bootstrap
 # import sklearn
@@ -21,13 +21,14 @@ from scipy.stats import bootstrap
 #---->
 from MyOptimizer import create_optimizer
 from MyLoss import create_loss
+from utils.utils import get_confusion_matrix, get_optimal_operating_point, get_roc_curve_2, get_pr_curve_2
 from utils.utils import cross_entropy_torch
 from utils.custom_resnet50 import resnet50_baseline
 
 from timm.loss import AsymmetricLossSingleLabel
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy, JsdCrossEntropy
-from libauc.losses import AUCMLoss, AUCM_MultiLabel, CompositionalAUCLoss
-from libauc.optimizers import PESG, PDSCA
+# from libauc.losses import AUCMLoss, AUCM_MultiLabel, CompositionalAUCLoss
+# from libauc.optimizers import PESG, PDSCA
 #---->
 import torch
 import torch.nn as nn
@@ -51,18 +52,21 @@ from monai.networks.nets import milmodel
 
 #---->
 import pytorch_lightning as pl
-from .vision_transformer import vit_small
+# from .vision_transformer import vit_small
 import torchvision
 from torchvision import models
 from torchvision.models import resnet
-from transformers import AutoFeatureExtractor, ViTModel, SwinModel
+# from transformers import AutoFeatureExtractor, ViTModel, SwinModel
 
 from pytorch_grad_cam import GradCAM, EigenGradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-from captum.attr import LayerGradCam
+# from captum.attr import LayerGradCam
 import models.ResNet as ResNet
+
+import scienceplots
+
 
 LABEL_MAP = {
     # 'bin': {'0': 0, '1': 1, '2': 1, '3': 1, '4': 1, '5': None},
@@ -76,6 +80,10 @@ LABEL_MAP = {
     'rej_rest': {'0': 'Rejection', '1': 'Rest'},
     'rest_rej': {'0': 'Rest', '1': 'Rejection'},
     'norm_rej_rest': {'0': 'Normal', '1': 'Rejection', '2': 'Rest'},
+    'tcmr_abmr': {'0': 'TCMR', '1': 'ABMR'},
+    'big_three': {'0': 'ccRCC', '1': 'papRCC', '2': 'chRCC'},
+    'tcmr': {'0': 'Other', '1': 'TCMR'},
+
 
 }
 COLOR_MAP = ['#377eb8', '#ff7f00', '#4daf4a',
@@ -118,9 +126,9 @@ class ModelInterface(pl.LightningModule):
         
         if model.name == 'AttTrans':
             self.model = milmodel.MILModel(num_classes=self.n_classes, pretrained=True, mil_mode='att_trans')
-        elif model.name == 'vit':
-            self.model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=self.n_classes)
-            self.model.patch_embed = nn.Sequential(nn.Linear(self.in_features, 768), nn.Identity())
+        # elif model.name == 'vit':
+        #     self.model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=self.n_classes)
+        #     self.model.patch_embed = nn.Sequential(nn.Linear(self.in_features, 768), nn.Identity())
         elif model.name == 'resnet50':
             self.model = models.resnet50(weights='IMAGENET1K_V1')
             self.model.conv1 = torch.nn.Conv2d(self.in_features, 64, kernel_size=(7,7), stride=(2,2), padding=(3,3))
@@ -601,6 +609,9 @@ class ModelInterface(pl.LightningModule):
     def test_step(self, batch, batch_idx):
 
         input, label, (wsi_name, batch_names, patient) = batch
+        print(input.shape)
+        # print(wsi_name)
+        # print(input.shape)
         # 
         # get attention ##
         # input = input.float()
@@ -710,15 +721,19 @@ class ModelInterface(pl.LightningModule):
 
         for p in complete_patient_dict.keys():
             score = []
+            # print(complete_patient_dict[p])
+            # break
             for (slide, probs) in complete_patient_dict[p]['scores']:
                 score.append(probs)
             
             score = torch.stack(score)
             # print(score)
-            if self.n_classes <= 2:
-                positive_positions = (score.argmax(dim=1) == 1).nonzero().squeeze()
-                if positive_positions.numel() != 0:
-                    score = score[positive_positions]
+            
+            # if self.n_classes <= 2:
+            #     positive_positions = (score.argmax(dim=1) == 1).nonzero().squeeze()
+            #     if positive_positions.numel() != 0:
+            #         score = score[positive_positions]
+
             # elif self.n_classes > 2: 
             #     positive_positions = (score.argmax(dim=1) > 0).nonzero().squeeze()
             #     if positive_positions.numel() == 1:
@@ -744,22 +759,27 @@ class ModelInterface(pl.LightningModule):
 
             complete_patient_dict[p]['patient_score'] = score
 
-        
+        # print(len(complete_patient_dict.keys()))
+        # print(complete_patient_dict[])
 
         
-        self.save_results(complete_patient_dict, patient_target)
+        self.save_results(complete_patient_dict, patient_target, 'test_0.1')
         
         
 
         opt_threshold = self.load_thresholds(torch.stack(patient_score), torch.stack(patient_target), stage='test', comment='patient')
         # print(opt_threshold)
         if self.n_classes > 2:
-            opt_threshold = [0.5] * self.n_classes 
+            opt_threshold = [1/self.n_classes] * self.n_classes 
         else: 
             opt_threshold = [1-opt_threshold, opt_threshold]
         # print(opt_threshold[1])
         # self.log_topk_patients(complete_patient_dict, patient_target, thresh=opt_threshold, stage='test')
-        self.log_topk_patients(list(complete_patient_dict.keys()), patient_score, patient_target, thresh=opt_threshold, stage='test')
+        # print(len(complete_patient_dict))
+            
+
+        # temporarily uncommented for train/validation metric generation
+        # self.log_topk_patients(list(complete_patient_dict.keys()), patient_score, patient_target, thresh=opt_threshold, stage='test')
 
 
         # get topk patients
@@ -873,11 +893,10 @@ class ModelInterface(pl.LightningModule):
         return result
 
     
-    def save_results(self, complete_patient_dict, patient_target):
+    def save_results(self, complete_patient_dict, patient_target, mode='test'):
 
         # print(complete_patient_dict)
         label_mapping = LABEL_MAP[self.task]
-
 
         patient_output_dict = {'PATIENT': [], 'yTrue': []}
         for i in range(self.n_classes):
@@ -893,7 +912,7 @@ class ModelInterface(pl.LightningModule):
 
         # json.dump(patient_output_dict, open(f'{self.loggers[0].log_dir}/results.json', 'w'))
         out_df = pd.DataFrame.from_dict(patient_output_dict)
-        out_df.to_csv(f'{self.loggers[0].log_dir}/TEST_RESULT_PATIENT.csv')
+        out_df.to_csv(f'{self.loggers[0].log_dir}/{mode.upper()}_RESULT_PATIENT.csv')
 
         slide_output_dict = {'SLIDE': [], 'yTrue': []}
         
@@ -923,7 +942,7 @@ class ModelInterface(pl.LightningModule):
                 slide_output_dict['yTrue'].append(t.item())
 
         out_df = pd.DataFrame.from_dict(slide_output_dict)
-        out_df.to_csv(f'{self.loggers[0].log_dir}/TEST_RESULT_SLIDE.csv')
+        out_df.to_csv(f'{self.loggers[0].log_dir}/{mode.upper()}_RESULT_SLIDE.csv')
 
 
         # slide_output_dict['SLIDE'] = list(complete_patient_dict)
@@ -963,7 +982,7 @@ class ModelInterface(pl.LightningModule):
 
         return optimal_fpr, optimal_tpr, optimal_threshold
 
-    def log_topk_patients(self, patient_list, patient_scores, patient_target, thresh=[], stage='val',  k=5):
+    def log_topk_patients(self, patient_list, patient_scores, patient_target, thresh=[], stage='val',  k=50):
         
         # patient_target = np.array([i.item() for i in patient_target])
         patient_target = torch.Tensor(patient_target)
@@ -976,15 +995,14 @@ class ModelInterface(pl.LightningModule):
 
             n_patients = patient_list[patient_target == n]
             n_scores = [s[n] for s in patient_scores[patient_target == n]]
-            # print(n_patients)
 
             topk_csv_path = f'{self.loggers[0].log_dir}/{stage}_c{n}_top_patients.csv'
 
+            print('class: ', n, len(n_scores))
+            if len(n_scores) < k:
+                k = len(n_scores)
             topk_scores, topk_indices = torch.topk(torch.Tensor(n_scores), k, dim=0)
 
-        #     # print(topk_indices)
-        #     # print(patient_list) 
-            
             topk_scores = [i for i in topk_scores if i > thresh[n]]
             topk_indices = topk_indices[:len(topk_scores)]
             topk_patients = [n_patients[i] for i in topk_indices]
@@ -1014,7 +1032,7 @@ class ModelInterface(pl.LightningModule):
             # thresh_df.to_csv(threshold_csv_path, index=False)
 
         elif stage == 'test': 
-            optimal_threshold = thresh_df.at[0, comment]
+            # optimal_threshold = thresh_df.at[0, comment]
             print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
 
         return optimal_threshold
@@ -1036,57 +1054,63 @@ class ModelInterface(pl.LightningModule):
             thresh_df.to_csv(threshold_csv_path, index=False)
 
         thresh_df = pd.read_csv(threshold_csv_path)
-        if stage != 'test':
-            if self.n_classes <= 2:
+        with plt.style.context(['science', 'nature', 'no-latex']):
+
+            fig, ax = plt.subplots(figsize=(10,10), layout='constrained')
+            if stage != 'test':
+                if self.n_classes <= 2:
+                    fpr_list, tpr_list, thresholds = self.ROC(probs, target)
+                    optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
+                    # print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
+                    thresh_df.at[0, comment] =  optimal_threshold
+                    thresh_df.to_csv(threshold_csv_path, index=False)
+                else: 
+                    # fpr_list, tpr_list, thresholds = multiclass_roc(probs, target)
+                    # optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
+            
+                    optimal_threshold = 1/self.n_classes
+            elif stage == 'test': 
+
                 fpr_list, tpr_list, thresholds = self.ROC(probs, target)
-                optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
-                # print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
-                thresh_df.at[0, comment] =  optimal_threshold
-                thresh_df.to_csv(threshold_csv_path, index=False)
-            else: 
-                # fpr_list, tpr_list, thresholds = multiclass_roc(probs, target)
+
                 # optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
-
-                optimal_threshold = 1/self.n_classes
-        elif stage == 'test': 
+                # optimal_threshold
+                if self.n_classes <= 2:
+                    optimal_fpr, optimal_tpr, optimal_threshold = self.get_optimal_operating_point(fpr_list, tpr_list, thresholds)
+                    # print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
+                    # confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold)
+                    
+                else:
+                    optimal_threshold = 1/self.n_classes
+                # confmat = confusion_matrix(probs, target, task='multiclass', num_classes=self.n_classes)
             
-            optimal_threshold = thresh_df.at[0, comment]
-            print(f'Optimal Threshold {stage} {comment}: ', optimal_threshold)
-            # optimal_threshold = 0.5 # manually change to val_optimal_threshold for testing
-
-        # print(confmat)
-        # confmat = self.confusion_matrix(preds, target, threshold=optimal_threshold)
-        if self.n_classes <= 2:
-            confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold)
+            get_confusion_matrix(probs, target, self.task, optimal_threshold, ax=ax)
             
-        else:
-            confmat = confusion_matrix(probs, target, task='multiclass', num_classes=self.n_classes)
-        # print(stage, comment)
-        # print(confmat)
-        cm_labels = LABEL_MAP[self.task].values()
+            # cm_labels = LABEL_MAP[self.task].values()
 
-        fig, ax = plt.subplots()
+            
 
-        # df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
-        df_cm = pd.DataFrame(confmat.cpu().numpy(), index=cm_labels, columns=cm_labels)
-        # fig_ = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Spectral').get_figure()
-        cm_plot = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Spectral')
+            # df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
+            # df_cm = pd.DataFrame(confmat.cpu().numpy(), index=cm_labels, columns=cm_labels)
+            # fig_ = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Spectral').get_figure()
+            # cm_plot = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Spectral')
         
         # cm_plot = 
         if stage == 'train':
-            self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', cm_plot.figure, self.current_epoch)
+            # self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', cm_plot.figure, self.current_epoch)
+            self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', fig, self.current_epoch)
             if len(self.loggers) > 2:
-                self.loggers[2].log_image(key=f'{stage}/Confusion matrix', images=[cm_plot.figure], caption=[self.current_epoch])
+                self.loggers[2].log_image(key=f'{stage}/Confusion matrix', images=[fig], caption=[self.current_epoch])
             # self.loggers[0].experiment.add_figure(f'{stage}/Confusion matrix', cm_plot.figure, self.current_epoch)
         else:
             ax.set_title(f'{stage}_{comment}')
             if comment: 
                 stage += f'_{comment}'
             # fig_.savefig(f'{self.loggers[0].log_dir}/cm_{stage}.png', dpi=400)
-            cm_plot.figure.savefig(f'{self.loggers[0].log_dir}/{stage}_cm.png', dpi=400)
+            fig.savefig(f'{self.loggers[0].log_dir}/{stage}_cm.png', dpi=400)
 
         # fig.clf()
-        cm_plot.figure.clf()
+        fig.clf()
 
 
 
@@ -1234,8 +1258,8 @@ class ModelInterface(pl.LightningModule):
         # Change the `trans_unet.py` file name to `TransUnet` class name.
         # Please always name your model file name as `trans_unet.py` and
         # class name or funciton name corresponding `TransUnet`.
-        if name == 'ViT':
-            self.model = ViT
+        # if name == 'ViT':
+        #     self.model = ViT
 
         if '_' in name:
             camel_name = ''.join([i.capitalize() for i in name.split('_')])

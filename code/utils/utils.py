@@ -11,8 +11,6 @@ from torchmetrics.classification.accuracy import Accuracy
 
 from pytorch_lightning import LightningDataModule, seed_everything, Trainer
 from pytorch_lightning import LightningModule
-# from pytorch_lightning.loops.base import Loop
-# from pytorch_lightning.loops.fit_loop import FitLoop
 from pytorch_lightning.trainer.states import TrainerFn
 from pytorch_lightning.callbacks import LearningRateMonitor, BatchSizeFinder, DeviceStatsMonitor
 from typing import Any, Dict, List, Optional, Type
@@ -48,11 +46,15 @@ LABEL_MAP = {
     'rej_rest': {'0': 'Rejection', '1': 'Other'},
     'rest_rej': {'0': 'Other', '1': 'Rejection'},
     'norm_rej_rest': {'0': 'Normal', '1': 'Rejection', '2': 'Other'},
+    'big_three': {'0': 'ccRCC', '1': 'papRCC', '2': 'chRCC'},
+    'tcmr_abmr': {'0': 'TCMR', '1': 'ABMR'},
+    'tcmr': {'0': 'Other', '1': 'TCMR'},
 
 }
 COLOR_MAP = ['#377eb8', '#ff7f00', '#4daf4a',
                   '#f781bf', '#a65628', '#984ea3',
                   '#999999', '#e41a1c', '#dede00']
+COLOR_MAP = ['#377eb8', '#ff7f00', '#f781bf']
 
 
 #---->read yaml
@@ -274,8 +276,138 @@ def get_optimal_operating_point(probs, target):
     return optimal_fpr, optimal_tpr, optimal_threshold
 
 
+def get_roc_curve_2(probs, target, mean_auroc, task, ax=None, target_label=0, target_class=''):
 
-def get_roc_curve(probs, target, task, model, separate=True):
+    
+
+    if type(probs) is np.ndarray:
+        probs = torch.from_numpy(probs)
+    if type(target) is np.ndarray:
+        target = torch.from_numpy(target)
+    
+    task_label_map = LABEL_MAP[task]
+    n_classes = len([v for v in task_label_map.values() if v != None])
+    print(n_classes)
+    
+    if n_classes <= 2:
+        auroc_score = binary_auroc(probs, target)
+        ROC = torchmetrics.ROC(task='binary')
+    else:
+        # n_classes = 3
+        # print(n_classes)
+        # print(probs)
+        # print(target)
+        auroc_score = multiclass_auroc(probs, target, num_classes=n_classes, average=None)
+        ROC = torchmetrics.ROC(task='multiclass', num_classes=n_classes)
+
+    fpr_list, tpr_list, thresholds = ROC(probs, target)
+
+    plots = []
+    if n_classes > 2:
+        # print(target_label)
+        color = COLOR_MAP[target_label]
+        
+        fpr = fpr_list[target_label].cpu().numpy()
+        tpr = tpr_list[target_label].cpu().numpy()
+        df = pd.DataFrame(data = {'fpr': fpr, 'tpr': tpr})
+        # print(df)
+        # color = COLOR_MAP[0]
+        line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score[target_label]:.3f}', legend='full', color=color, linewidth=5, errorbar=('ci', 95), ax=ax)
+        line_plot.set(xlabel=None)
+        line_plot.set(ylabel=None)
+        ax.legend(title=f'MEAN: {mean_auroc:.3f}', title_fontsize=50, loc='lower right', fontsize=50, frameon=False, borderpad=0, alignment='right')
+        # print(ax.get_ymajorticklabels())
+        
+
+    else: 
+        color = COLOR_MAP[target_label]
+        
+        optimal_fpr, optimal_tpr, optimal_threshold = get_optimal_operating_point(probs, target)
+        fpr = fpr_list.cpu().numpy()
+        tpr = tpr_list.cpu().numpy()
+        optimal_fpr = optimal_fpr.cpu().numpy()
+        optimal_tpr = optimal_tpr.cpu().numpy()
+
+        df = pd.DataFrame(data = {'fpr': fpr, 'tpr': tpr})
+        line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score:.3f}', legend='full', color=color, linewidth=5, errorbar=('ci', 95), ax = ax) #AUROC
+        line_plot.set(xlabel=None)
+        line_plot.set(ylabel=None)
+        ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
+        
+    ax.plot([0,1], [0,1], linestyle='--', color='red')
+    ax.set_xlim([0.0,1.0])
+    ax.set_ylim([0.0,1.0])
+    ax.set_xticks([0.0, 0.5, 1.0])
+    ax.set_yticks([0.5, 1.0])
+    # ax.set_xlabel('FPR (1-specificity)', fontsize=50, labelpad=20) #False positive rate (1-specificity)
+    # ax.set_ylabel('TPR (sensitivity)', fontsize=50, labelpad=20)
+    ax.tick_params(axis='x', labelsize=50)
+    ax.tick_params(axis='y', labelsize=50)
+    # print(ax.get_ymajorticklabels())
+    # print(ax.get_ymajorticklabels()[0])
+    # ax.xaxis.set_ticks(np.arange(0.0, 1.0, 0.2))
+    # ax.yaxis.set_ticks(np.arange(0.0, 1.0, 0.2))
+    # ax.get_ymajorticklabels()[0].set_visible(False)
+    # ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
+
+def get_pr_curve_2(probs, target, mean_precision, task, ax=None, target_label=0, target_class=''):
+
+    if type(probs) is np.ndarray:
+        probs = torch.from_numpy(probs)
+    if type(target) is np.ndarray:
+        target = torch.from_numpy(target)
+    
+    task_label_map = LABEL_MAP[task]
+    n_classes = len([v for v in task_label_map.values() if v != None])
+    
+    if n_classes <= 2:
+        precision, recall, thresholds = binary_precision_recall_curve(probs, target)
+    else:
+        # auroc_score = multiclass_auroc(probs, target, num_classes=n_classes, average=None)
+        precision, recall, thresholds = multiclass_precision_recall_curve(probs, target, num_classes=n_classes)
+        
+
+    # fpr_list, tpr_list, thresholds = ROC(probs, target)
+
+    plots = []
+    if n_classes > 2:
+        color = COLOR_MAP[target_label]
+        
+        re = recall[target_label]
+        pr = precision[target_label]
+        # no_skill = len(target[target==target_label]) / len(target)
+        
+        partial_auc = _auc_compute(re, pr, 1.0)
+        df = pd.DataFrame(data = {'re': re.cpu().numpy(), 'pr': pr.cpu().numpy()})
+        line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', errorbar=('ci', 95), color=color, linewidth=5, ax = ax)
+        line_plot.set(xlabel=None)
+        line_plot.set(ylabel=None)
+    else: 
+        color = COLOR_MAP[0]
+        # precision, recall, thresholds = binary_precision_recall_curve(probs, target)
+        baseline = len(target[target==1]) / len(target)
+        
+        pr = precision
+        re = recall
+        partial_auc = _auc_compute(re, pr, 1.0) # - baseline
+        # ax.plot(re, pr)
+        df = pd.DataFrame(data = {'re': re.cpu().numpy(), 'pr': pr.cpu().numpy()})
+        line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', color=color, linewidth=5, ax = ax)
+    
+    # ax.plot([0,1], [mean_precision, mean_precision], linestyle='--', color='red') #label=f'Baseline={baseline:.3f}', 
+    # ax.annotate(f'Average Precision={mean_precision:.2f}', (0.5, mean_precision), textcoords='offset points', xytext=(0,-30), ha='right', fontsize=30)
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    # ax.set_xlabel('Recall', fontsize=AXIS_SIZE, labelpad=20)
+    # ax.set_ylabel('Precision', fontsize=AXIS_SIZE, labelpad=20)
+    ax.set_xticks([0.0, 0.5, 1.0])
+    ax.set_yticks([0.5, 1.0])
+    ax.tick_params(axis='x', labelsize=50)
+    ax.tick_params(axis='y', labelsize=50)
+    # ax.get_ymajorticklabels()[0].set_visible(False)
+    ax.legend(loc='lower left', fontsize=50, frameon=False)
+
+def get_roc_curve(probs, target, task, model, ax=None, separate=True):
 
     if type(probs) is np.ndarray:
         probs = torch.from_numpy(probs)
@@ -292,23 +424,7 @@ def get_roc_curve(probs, target, task, model, separate=True):
         n_classes = 3
         ROC = torchmetrics.ROC(task='multiclass', num_classes=n_classes)
         
-    # if task == 'norm_rest' or task == 'rej_rest' or task == 'rest_rej':
-
-    #     n_classes = 2
-    #     ROC = torchmetrics.ROC(task='binary')
-    # else: 
-    #     n_classes = 3
-    #     ROC = torchmetrics.ROC(task='multiclass', num_classes=n_classes)
-
     fpr_list, tpr_list, thresholds = ROC(probs, target)
-
-
-    
-    # print(probs)
-    # print(target)
-    # print(probs.shape)
-    # print(target.shape)
-    # fig, ax = plt.subplots(figsize=(6,6))
 
     plots = []
     if n_classes > 2:
@@ -325,12 +441,12 @@ def get_roc_curve(probs, target, task, model, separate=True):
             tpr = tpr_list[i].cpu().numpy()
             # ax.plot(fpr, tpr, label=f'class_{i}, AUROC={auroc_score[i]}')
             df = pd.DataFrame(data = {'fpr': fpr, 'tpr': tpr})
-            # line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score[i]:.3f}', legend='full', color=color, linewidth=3)
+            # line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score[i]:.3f}', legend='full', color=color, linewidth=5)
 
             ### temporary!!!
             if separate:
                 color = COLOR_MAP[0]
-                line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score[i]:.3f}', legend='full', color=color, linewidth=3, )
+                line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score[i]:.3f}', legend='full', color=color, linewidth=5, )
                 add_on = i
                 # output_dir = f'/homeStor1/ylan/workspace/TransMIL-DeepGraft/test/results/{model}/'
                 output_dir = f'/homeStor1/ylan/DeepGraft_project/DeepGraft_Draft/figures/{model}'
@@ -340,28 +456,28 @@ def get_roc_curve(probs, target, task, model, separate=True):
                 ax.set_ylim([0,1])
                 ax.set_xlabel('', fontsize=18)
                 # 
-                ax.set_ylabel('True positive rate (sensitivity)', fontsize=AXIS_SIZE)
+                ax.set_ylabel('True positive rate (sensitivity)', fontsize=AXIS_SIZE, labelpad=20)
 
                 # if i == 2:
-                ax.set_xlabel('False positive rate (1-specificity)', fontsize=AXIS_SIZE)
+                ax.set_xlabel('False positive rate (1-specificity)', fontsize=AXIS_SIZE, labelpad=20)
                 # else:
                     # ax.set_xlabel('', fontsize=AXIS_SIZE)
-                ax.tick_params(axis='x', labelsize=25)
-                ax.tick_params(axis='y', labelsize=25)
+                ax.tick_params(axis='x', labelsize=30)
+                ax.tick_params(axis='y', labelsize=30)
                 # ax.set_yticklabels(fontsize=15)
                 # ax.set_title('ROC curve')
-                ax.legend(loc='lower right', fontsize=LEGEND_SIZE)
-
+                ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
+                ax.get_ymajorticklabels()[0].set_visible(False)
                 line_plot.figure.savefig(f'{output_dir}/{model}_{task}_{add_on}_roc.png', dpi=400)
                 line_plot.figure.savefig(f'{output_dir}/{model}_{task}_{add_on}_roc.svg', format='svg')
             #     # plt.show()
 
-            #     line_plot.figure.clf()
+                line_plot.figure.clf()
             #     plots.append(fig)
             # else:
 
     else: 
-        fig, ax = plt.subplots(figsize=(10,10))
+        # fig, ax = plt.subplots(figsize=(10,10))
         auroc_score = binary_auroc(probs, target)
         color = COLOR_MAP[0]
         
@@ -372,7 +488,7 @@ def get_roc_curve(probs, target, task, model, separate=True):
         optimal_tpr = optimal_tpr.cpu().numpy()
 
         df = pd.DataFrame(data = {'fpr': fpr, 'tpr': tpr})
-        line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score:.3f}', legend='full', color=color, linewidth=3, errorbar=('ci', 95)) #AUROC
+        line_plot = sns.lineplot(data=df, x='fpr', y='tpr', label=f'{auroc_score:.3f}', legend='full', color=color, linewidth=5, errorbar=('ci', 95), ax = ax) #AUROC
         # ax.plot([0, 1], [optimal_tpr, optimal_tpr], linestyle='--', color='black', label=f'OOP={optimal_threshold:.3f}')
         # ax.plot([optimal_fpr, optimal_fpr], [0, 1], linestyle='--', color='black')
 
@@ -382,18 +498,19 @@ def get_roc_curve(probs, target, task, model, separate=True):
     ax.set_xlim([0,1])
     ax.set_ylim([0,1])
     # ax.set_xlabel('', fontsize=18)
-    ax.set_xlabel('False positive rate (1-specificity)', fontsize=AXIS_SIZE)
-    ax.set_ylabel('True positive rate (sensitivity)', fontsize=AXIS_SIZE)
-    ax.tick_params(axis='x', labelsize=25)
-    ax.tick_params(axis='y', labelsize=25)
+    ax.set_xlabel('False positive rate (1-specificity)', fontsize=AXIS_SIZE, labelpad=20)
+    ax.set_ylabel('True positive rate (sensitivity)', fontsize=AXIS_SIZE, labelpad=20)
+    ax.tick_params(axis='x', labelsize=30)
+    ax.tick_params(axis='y', labelsize=30)
     # ax.set_yticklabels(fontsize=15)
     # ax.set_title('ROC curve')
-    ax.legend(loc='lower right', fontsize=LEGEND_SIZE)
+    ax.get_ymajorticklabels()[0].set_visible(False)
+    ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
 
     # return plots
-    return line_plot
+    # return line_plot
 
-def get_pr_curve(probs, target, task, model, target_label=1):
+def get_pr_curve(probs, target, task, model, ax=None, target_label=1):
 
     if type(probs) is np.ndarray:
         probs = torch.from_numpy(probs)
@@ -410,7 +527,7 @@ def get_pr_curve(probs, target, task, model, target_label=1):
         # ROC = torchmetrics.ROC(task='multiclass', num_classes=n_classes)
     
     
-    fig, ax = plt.subplots(figsize=(10,10))
+    # fig, ax = plt.subplots(figsize=(10,10))
 
 
     
@@ -429,12 +546,12 @@ def get_pr_curve(probs, target, task, model, target_label=1):
             re = recall[i]
             pr = precision[i]
             
-            # baseline = len(target[target==i]) / len(target)
-            partial_auc = _auc_compute(re, pr, 1.0) #- baseline
-            df = pd.DataFrame(data = {'re': re.cpu().numpy(), 'pr': pr.cpu().numpy()})
-            line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', color=color, linewidth=3)
-
             baseline = len(target[target==i]) / len(target)
+            partial_auc = _auc_compute(re, pr, 1.0) - baseline
+            df = pd.DataFrame(data = {'re': re.cpu().numpy(), 'pr': pr.cpu().numpy()})
+            line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', color=color, linewidth=5, ax = ax)
+
+            # baseline = len(target[target==i]) / len(target)
             print(baseline)
             ax.plot([0,1],[baseline, baseline], linestyle='--', color=color)
 
@@ -446,13 +563,15 @@ def get_pr_curve(probs, target, task, model, target_label=1):
             ax.set_xlim([0,1])
             ax.set_ylim([0,1])
             # 
-            ax.set_xlabel('Precision', fontsize=AXIS_SIZE)
-            ax.set_ylabel('Recall', fontsize=AXIS_SIZE)
-            ax.tick_params(axis='x', labelsize=25)
-            ax.tick_params(axis='y', labelsize=25)
+            ax.set_xlabel('Precision', fontsize=AXIS_SIZE, labelpad=20)
+            ax.set_ylabel('Recall', fontsize=AXIS_SIZE, labelpad=20)
+            ax.tick_params(axis='x', labelsize=30)
+            ax.tick_params(axis='y', labelsize=30)
+            ax.get_ymajorticklabels()[0].set_visible(False)
             # ax.set_yticklabels(fontsize=15)
             # ax.set_title('ROC curve')
-            ax.legend(loc='lower right', fontsize=LEGEND_SIZE)
+            ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
+            
 
             line_plot.figure.savefig(f'{output_dir}/{model}_{task}_{add_on}_pr.png', dpi=400)
             line_plot.figure.savefig(f'{output_dir}/{model}_{task}_{add_on}_pr.svg', format='svg')
@@ -469,39 +588,47 @@ def get_pr_curve(probs, target, task, model, target_label=1):
         
         pr = precision
         re = recall
-        partial_auc = _auc_compute(re, pr, 1.0)
+        partial_auc = _auc_compute(re, pr, 1.0) - baseline
         # ax.plot(re, pr)
         df = pd.DataFrame(data = {'re': re.cpu().numpy(), 'pr': pr.cpu().numpy()})
-        line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', color=color)
+        line_plot = sns.lineplot(data=df, x='re', y='pr', label=f'{partial_auc:.3f}', legend='full', color=color, ax = ax)
     
         ax.plot([0,1], [baseline, baseline], linestyle='--', color=color) #label=f'Baseline={baseline:.3f}', 
 
     ax.set_xlim([0,1])
     ax.set_ylim([0,1])
-    ax.set_xlabel('Precision', fontsize=AXIS_SIZE)
-    # ax.set_xlabel('')
-    ax.set_ylabel('Recall', fontsize=AXIS_SIZE)
+    ax.set_xlabel('Recall', fontsize=AXIS_SIZE, labelpad=20)
+    ax.set_ylabel('Precision', fontsize=AXIS_SIZE, labelpad=20)
+    # ax.yticks(fontsize=25)
     # ax.set_title('PR curve')
-    ax.tick_params(axis='x', labelsize=25)
-    ax.tick_params(axis='y', labelsize=25)
-    ax.legend(loc='lower right', fontsize=LEGEND_SIZE)
+    ax.tick_params(axis='x', labelsize=30)
+    ax.tick_params(axis='y', labelsize=30)
+    ax.get_ymajorticklabels()[0].set_visible(False)
+    ax.legend(loc='lower right', fontsize=LEGEND_SIZE, frameon=False, handlelength=0)
 
-    return line_plot
+    # return line_plot
 
-def get_confusion_matrix(probs, target, task, optimal_threshold, comment='patient', stage='test'): # threshold
+def get_confusion_matrix(probs, target, task, optimal_threshold, ax=None, comment='patient', stage='test'): # threshold
 
     if type(probs) is np.ndarray:
         probs = torch.from_numpy(probs)
     if type(target) is np.ndarray:
         target = torch.from_numpy(target)
 
-    if task == 'norm_rest' or task == 'rej_rest' or task == 'rest_rej':
+    task_label_map  = LABEL_MAP[task]
+    n_classes = len([v for v in task_label_map.values() if v != None])
 
-        n_classes = 2 
+    if n_classes <= 2:
         ROC = torchmetrics.ROC(task='binary')
+        confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold, num_classes=n_classes)
+    # if task == 'norm_rest' or task == 'rej_rest' or task == 'rest_rej':
+        # n_classes = 2 
+        # ROC = torchmetrics.ROC(task='binary')
+        # confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold, num_classes=n_classes)
     else: 
-        n_classes = 3
         ROC = torchmetrics.ROC(task='multiclass', num_classes=n_classes)
+        confmat = confusion_matrix(probs, target, task='multiclass', num_classes=n_classes, threshold=optimal_threshold)
+
 
 
     # preds = torch.argmax(probs, dim=1)
@@ -544,23 +671,23 @@ def get_confusion_matrix(probs, target, task, optimal_threshold, comment='patien
 
     # print(confmat)
     # confmat = self.confusion_matrix(preds, target, threshold=optimal_threshold)
-    if n_classes == 2:
-        confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold)
-    elif n_classes > 2: 
-        confmat = confusion_matrix(probs, target, task='multiclass', num_classes=n_classes, threshold=optimal_threshold)
+    # if n_classes == 2:
+    #     confmat = confusion_matrix(probs, target, task='binary', threshold=optimal_threshold, num_classes=n_classes)
+    # elif n_classes > 2: 
+    #     confmat = confusion_matrix(probs, target, task='multiclass', num_classes=n_classes, threshold=optimal_threshold)
 
     cm_labels = LABEL_MAP[task].values()
 
     # fig, ax = plt.subplots()
-    figsize=plt.rcParams.get('figure.figsize')
-    plt.figure(figsize=(10, 10))
+    # figsize=plt.rcParams.get('figure.figsize')
+    # plt.figure(figsize=(10, 10))
 
     # df_cm = pd.DataFrame(confmat.cpu().numpy(), index=range(self.n_classes), columns=range(self.n_classes))
     df_cm = pd.DataFrame(confmat.cpu().numpy(), index=cm_labels, columns=cm_labels)
     print(df_cm)
     # fig_ = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Spectral').get_figure()
     # sns.set(font_scale=1.5)
-    cm_plot = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={'fontsize': LEGEND_SIZE, 'multialignment':'center'}) #
+    cm_plot = sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues', cbar=False, annot_kws={'fontsize': 25, 'multialignment':'center'}, ax=ax) #
     cm_plot.set_xticklabels(cm_plot.get_xmajorticklabels(), fontsize = 30)
     cm_plot.set_yticklabels(cm_plot.get_ymajorticklabels(), fontsize = 30)
     # cm_plot.xaxis.tick_top()
@@ -568,8 +695,8 @@ def get_confusion_matrix(probs, target, task, optimal_threshold, comment='patien
     # sns.set(font_scale=1.3)
 
     plt.yticks(va='center')
-    plt.ylabel('True', fontsize=AXIS_SIZE)
-    plt.xlabel('Prediction', fontsize=AXIS_SIZE)
+    plt.ylabel('True', fontsize=AXIS_SIZE, labelpad=20)
+    plt.xlabel('Prediction', fontsize=AXIS_SIZE, labelpad=20)
 
 
     
@@ -590,7 +717,7 @@ def get_confusion_matrix(probs, target, task, optimal_threshold, comment='patien
 
     # # fig.clf()
     # cm_plot.figure.clf()
-    return cm_plot, optimal_threshold
+    # return cm_plot, optimal_threshold
 
 
 if __name__ == '__main__':
